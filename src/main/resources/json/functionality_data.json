@@ -1,0 +1,174 @@
+{
+	"user": 1,
+	"datas": [
+		{
+			"code": "CONVERSATION",
+			"name": "CONVERSATION"
+		},
+		{
+			"code": "VIEW_CONVERSATION",
+			"parentCode": "CONVERSATION",
+			"name": "VIEW CONVERSATION"
+		},
+		{
+			"code": "CREATE_CONVERSATION",
+			"parentCode": "CONVERSATION",
+			"name": "CREATE CONVERSATION"
+		},
+		{
+			"code": "UPDATE_CONVERSATION",
+			"parentCode": "CONVERSATION",
+			"name": "UPDATE CONVERSATION"
+		},
+		{
+			"code": "DELETE_CONVERSATION",
+			"parentCode": "CONVERSATION",
+			"name": "DELETE CONVERSATION"
+		},
+		{
+			"code": "CONVERSATION_USER",
+			"name": "CONVERSATION_USER"
+		},
+		{
+			"code": "VIEW_CONVERSATION_USER",
+			"parentCode": "CONVERSATION_USER",
+			"name": "VIEW CONVERSATION_USER"
+		},
+		{
+			"code": "CREATE_CONVERSATION_USER",
+			"parentCode": "CONVERSATION_USER",
+			"name": "CREATE CONVERSATION_USER"
+		},
+		{
+			"code": "UPDATE_CONVERSATION_USER",
+			"parentCode": "CONVERSATION_USER",
+			"name": "UPDATE CONVERSATION_USER"
+		},
+		{
+			"code": "DELETE_CONVERSATION_USER",
+			"parentCode": "CONVERSATION_USER",
+			"name": "DELETE CONVERSATION_USER"
+		},
+		{
+			"code": "HISTORIQUE_SUPPRESSION_MESSAGE",
+			"name": "HISTORIQUE_SUPPRESSION_MESSAGE"
+		},
+		{
+			"code": "VIEW_HISTORIQUE_SUPPRESSION_MESSAGE",
+			"parentCode": "HISTORIQUE_SUPPRESSION_MESSAGE",
+			"name": "VIEW HISTORIQUE_SUPPRESSION_MESSAGE"
+		},
+		{
+			"code": "CREATE_HISTORIQUE_SUPPRESSION_MESSAGE",
+			"parentCode": "HISTORIQUE_SUPPRESSION_MESSAGE",
+			"name": "CREATE HISTORIQUE_SUPPRESSION_MESSAGE"
+		},
+		{
+			"code": "UPDATE_HISTORIQUE_SUPPRESSION_MESSAGE",
+			"parentCode": "HISTORIQUE_SUPPRESSION_MESSAGE",
+			"name": "UPDATE HISTORIQUE_SUPPRESSION_MESSAGE"
+		},
+		{
+			"code": "DELETE_HISTORIQUE_SUPPRESSION_MESSAGE",
+			"parentCode": "HISTORIQUE_SUPPRESSION_MESSAGE",
+			"name": "DELETE HISTORIQUE_SUPPRESSION_MESSAGE"
+		},
+		{
+			"code": "MESSAGE",
+			"name": "MESSAGE"
+		},
+		{
+			"code": "VIEW_MESSAGE",
+			"parentCode": "MESSAGE",
+			"name": "VIEW MESSAGE"
+		},
+		{
+			"code": "CREATE_MESSAGE",
+			"parentCode": "MESSAGE",
+			"name": "CREATE MESSAGE"
+		},
+		{
+			"code": "UPDATE_MESSAGE",
+			"parentCode": "MESSAGE",
+			"name": "UPDATE MESSAGE"
+		},
+		{
+			"code": "DELETE_MESSAGE",
+			"parentCode": "MESSAGE",
+			"name": "DELETE MESSAGE"
+		},
+		{
+			"code": "TYPE_CONVERSATION",
+			"name": "TYPE_CONVERSATION"
+		},
+		{
+			"code": "VIEW_TYPE_CONVERSATION",
+			"parentCode": "TYPE_CONVERSATION",
+			"name": "VIEW TYPE_CONVERSATION"
+		},
+		{
+			"code": "CREATE_TYPE_CONVERSATION",
+			"parentCode": "TYPE_CONVERSATION",
+			"name": "CREATE TYPE_CONVERSATION"
+		},
+		{
+			"code": "UPDATE_TYPE_CONVERSATION",
+			"parentCode": "TYPE_CONVERSATION",
+			"name": "UPDATE TYPE_CONVERSATION"
+		},
+		{
+			"code": "DELETE_TYPE_CONVERSATION",
+			"parentCode": "TYPE_CONVERSATION",
+			"name": "DELETE TYPE_CONVERSATION"
+		},
+		{
+			"code": "TYPE_MESSAGE",
+			"name": "TYPE_MESSAGE"
+		},
+		{
+			"code": "VIEW_TYPE_MESSAGE",
+			"parentCode": "TYPE_MESSAGE",
+			"name": "VIEW TYPE_MESSAGE"
+		},
+		{
+			"code": "CREATE_TYPE_MESSAGE",
+			"parentCode": "TYPE_MESSAGE",
+			"name": "CREATE TYPE_MESSAGE"
+		},
+		{
+			"code": "UPDATE_TYPE_MESSAGE",
+			"parentCode": "TYPE_MESSAGE",
+			"name": "UPDATE TYPE_MESSAGE"
+		},
+		{
+			"code": "DELETE_TYPE_MESSAGE",
+			"parentCode": "TYPE_MESSAGE",
+			"name": "DELETE TYPE_MESSAGE"
+		},
+		{
+			"code": "USER",
+			"name": "USER"
+		},
+		{
+			"code": "VIEW_USER",
+			"parentCode": "USER",
+			"name": "VIEW USER"
+		},
+		{
+			"code": "CREATE_USER",
+			"parentCode": "USER",
+			"name": "CREATE USER"
+		},
+		{
+			"code": "UPDATE_USER",
+			"parentCode": "USER",
+			"name": "UPDATE USER"
+		},
+		{
+			"code": "DELETE_USER",
+			"parentCode": "USER",
+			"name": "DELETE USER"
+		}
+
+	]
+}

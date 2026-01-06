@@ -1,0 +1,139 @@
+##----------------------------------------------------------------------------------------------------
+## JPA beans suffix
+##set ( $env.entityClassNameSuffix = "Dto" )
+#set ( $dto = ${entity.name} + "Dto" )
+#set ( $listOfForeignAttrib = ["code", "name", "firstName", "lastName", "libelle", "intitule", "login", "nom", "prenoms", "prenom", "denomination", "codeGroupe", "libelleGroupe", "raisonSociale", "email", "telephone", "ref"])
+
+/*
+ * Java dto for entity table ${entity.databaseTable} 
+ * Created on $today.date ( Time $today.time )
+ * Generator tool : $generator.name ( version $generator.version )
+ * Copyright 2018 Geo. All Rights Reserved.
+ */
+
+package ${target.javaPackageFromFolder(${SRC})};
+
+#foreach( $import in $java.imports($entity) )
+import $import;
+#end
+#foreach( $import in $java.imports($entity.attributes) )
+import $import;
+#end
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+
+
+import lombok.*;
+
+import ${ROOT_PKG}.utils.contract.*;
+
+/**
+ * DTO customize for table "${entity.databaseTable}"
+ * 
+ * @author Smile Back-End generator
+ *
+ */
+@Data
+@ToString
+@JsonInclude(Include.NON_NULL)
+@JsonPropertyOrder(alphabetic = true)
+public class _${dto} implements Cloneable {
+
+#foreach( $field in $entity.keyAttributes )
+#if (${field.databaseComment} != "")
+	/*
+	 * $field.databaseComment
+	 */
+#end
+    protected $field.formattedType(10) $field.formattedName(20) #if($field.hasInitialValue())= ${field.initialValue} #end; // Primary Key
+#end
+
+#foreach( $field in $entity.nonKeyAttributes )
+#if ( !$field.isTimestampType() )
+#if (${field.databaseComment} != "")
+	/*
+	 * $field.databaseComment
+	 */
+#end
+    protected $field.formattedType(10) $field.formattedName(20) #if($field.hasInitialValue())= ${field.initialValue} #end;
+#else
+#set ( $padderString = "" )
+#if (${field.databaseComment} != "")
+	/*
+	 * $field.databaseComment
+	 */
+#end
+	protected $padderString.format("%-10s", "String") $field.formattedName(20) #if($field.hasInitialValue())= ${field.initialValue} #end;
+#end
+#end
+
+    //----------------------------------------------------------------------
+    // ENTITY LINKS FIELD ( RELATIONSHIP )
+    //----------------------------------------------------------------------
+#foreach( $link in $entity.selectedLinks )
+#if($link.isCardinalityManyToOne() || $link.isCardinalityOneToOne())
+#set( $entityFk = $link.targetEntity)
+#foreach($entityFkAttrib in $entityFk.keyAttributes)
+	//protected $entityFkAttrib.formattedType(10) $fn.uncapitalize($entityFk.name);
+#end
+##--------------------
+#foreach($attrib in $entityFk.attributes)
+#set( $currentLinkField = "$fn.uncapitalize($entityFk.name)$fn.capitalize($attrib.name)" )
+#if($listOfForeignAttrib.indexOf($attrib.name) != -1)
+	protected String $currentLinkField;
+#end
+#end
+##--------------------
+#end
+#end
+
+	// Search param
+#foreach( $field in $entity.attributes)
+#set ( $padderString = "" )
+#if($field.isTimestampType())
+	#set ( $searchParamType = "SearchParam<String>" )
+#else
+	#set ( $searchParamType = "SearchParam<" + $fn.capitalize($field.type) + ">" )
+#end
+#set ( $searchParamName = ${field.name} + "Param" )
+	protected $padderString.format("%-22s%-22s%-22s", $searchParamType, $searchParamName, ";")
+#end
+##-------------------------------------------------------------------BEGIN
+#foreach( $link in $entity.selectedLinks )
+#if($link.isCardinalityManyToOne() || $link.isCardinalityOneToOne())
+#set( $entityFk = $link.targetEntity)
+#foreach($entityFkAttrib in $entityFk.keyAttributes)
+#set ( $padderString = "" )
+#set($searchParamType = "SearchParam<" + ${entityFkAttrib.type}+ ">")
+#set($searchParamName = "$fn.uncapitalize($entityFk.name)" + "Param" )
+	protected $padderString.format("%-22s%-22s%-22s", $searchParamType, $searchParamName, ";")
+#end
+##--------------------
+#foreach($attrib in $entityFk.attributes)
+#set( $currentLinkField = "$fn.uncapitalize($entityFk.name)$fn.capitalize($attrib.name)" )
+#if($listOfForeignAttrib.indexOf($attrib.name) != -1)
+#set ( $padderString = "" )
+#if($attrib.isTimestampType())
+	#set ( $searchParamType = "SearchParam<String>" )
+#end
+#if(!$attrib.isTimestampType())
+	#set ( $searchParamType = "SearchParam<" + ${attrib.type}+ ">" )
+#end
+#set ( $searchParamName = "$fn.uncapitalize($entityFk.name)$fn.capitalize($attrib.name)" + "Param" )
+	protected $padderString.format("%-22s%-22s%-22s", $searchParamType, $searchParamName, ";")
+#end
+#end
+##--------------------
+#end
+#end
+##-------------------------------------------------------------------END
+
+	// order param
+	protected String orderField;
+	protected String orderDirection;
+
+
+
+
+}

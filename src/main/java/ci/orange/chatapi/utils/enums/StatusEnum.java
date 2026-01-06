@@ -1,0 +1,28 @@
+/*
+ * Created on 2026-01-03 ( Time 10:00:17 )
+ * Generator tool : Telosys Tools Generator ( version 3.3.0 )
+ * Copyright 2023 Ziet. All Rights Reserved.
+ */
+package ci.orange.chatapi.utils.enums;
+import java.util.Arrays;
+import java.util.List;
+
+public class StatusEnum {
+
+	public static final int ACTIVE        	  	=	1;
+	public static final int DESACTIVE       	= 	2;
+	public static final int CREER       		= 	3;
+	public static final int EN_COURS			=	4;
+	public static final int NON_DEMARRER		=	5;
+	public static final int EXPIRER				=	6;
+	public static final int TERMINER			=	7;
+	public static final int SUSPENDU			=	8;
+	public static final int ANNULER				=	9;
+	public static final int PLANIFIER			=	10;
+	public static final int VALIDER 			=   11;
+	public static final int EN_ATTENTE = 12;
+	public static final int SUCCESS = 13;
+	public static final int ECHEC = 14;
+	
+	
+}

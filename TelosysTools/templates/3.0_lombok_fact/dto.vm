@@ -1,0 +1,51 @@
+##----------------------------------------------------------------------------------------------------
+## JPA beans suffix
+##set ( $env.entityClassNameSuffix = "Dto" )
+#set ( $dto = ${entity.name} + "Dto" )
+#set ( $listOfForeignAttrib = ["code", "name", "firstName", "lastName", "libelle", "intitule", "login", "nom", "prenoms", "prenom", "denomination", "codeGroupe", "libelleGroupe", "raisonSociale", "email", "telephone", "ref"])
+
+/*
+ * Java dto for entity table ${entity.databaseTable} 
+ * Created on $today.date ( Time $today.time )
+ * Generator tool : $generator.name ( version $generator.version )
+ * Copyright 2018 Geo. All Rights Reserved.
+ */
+
+package ${target.javaPackageFromFolder(${SRC})};
+
+#foreach( $import in $java.imports($entity) )
+import $import;
+#end
+#foreach( $import in $java.imports($entity.attributes) )
+import $import;
+#end
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonInclude.Include;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+
+import lombok.*;
+
+import ${ROOT_PKG}.utils.contract.*;
+import ${ROOT_PKG}.utils.dto.base._${dto};
+
+/**
+ * DTO for table "${entity.databaseTable}"
+ *
+ * @author Geo
+ */
+@Data
+@ToString
+@JsonInclude(Include.NON_NULL)
+@JsonPropertyOrder(alphabetic = true)
+public class ${dto} extends _${dto}{
+
+    private String    statusLibelle               ;
+    
+	//----------------------------------------------------------------------
+    // clone METHOD
+    //----------------------------------------------------------------------
+	@Override
+	public Object clone() throws CloneNotSupportedException {
+		return super.clone();
+	}
+}

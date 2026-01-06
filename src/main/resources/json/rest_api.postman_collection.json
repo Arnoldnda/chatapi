@@ -1,0 +1,802 @@
+
+{
+
+    "info": {
+        "_postman_id": "df67b7b8-9986-4f5f-836e-e0af58c8e968",
+        "name": "ci_orange_chatapi",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+		{
+			"name": "conversation",
+			"item": [
+                {
+					"name": "conversation.create",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"titre\": \"\", \t\t\t\"typeConversationId\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+						},
+						"url": {
+							"raw": "{{appUrl}}/conversation/create",
+							"host": [
+								"{{appUrl}}"
+							],
+							"path": [
+								"conversation",
+								"create"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+                    "name": "conversation.update",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\", \t\t\t\"titre\": \"\", \t\t\t\"typeConversationId\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+                        },
+                        "url": {
+                            "raw": "{{appUrl}}/conversation/update",
+                            "host": [
+                                "{{appUrl}}"
+                            ],
+                            "path": [
+                                "conversation",
+                                "update"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                     "name": "conversation.delete",
+                     "request": {
+                         "method": "POST",
+                         "header": [
+                             {
+                                 "key": "Content-Type",
+                                 "value": "application/json"
+                             }
+                         ],
+                         "body": {
+                             "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\" \t\t}  \t]   }"
+                         },
+                         "url": {
+                             "raw": "{{appUrl}}/conversation/delete",
+                             "host": [
+                                 "{{appUrl}}"
+                             ],
+                             "path": [
+                                 "conversation",
+                                 "delete"
+                             ]
+                         }
+                     },
+                     "response": []
+                 },
+                 {
+                   "name": "conversation.getByCriteria",
+                   "request": {
+                       "method": "POST",
+                       "header": [
+                           {
+                               "key": "Content-Type",
+                               "value": "application/json"
+                           }
+                       ],
+                       "body": {
+                           "mode": "raw",
+			            "raw": "{ \t\"user\":\"1\", \t\"isSimpleLoading\":false, \t\"data\":{   \t\t\"id\": \"\", \t\t\"titre\": \"\", \t\t\"typeConversationId\": \"\", \t\t\"createdAt\": \"\", \t\t\"updatedAt\": \"\", \t\t\"deletedAt\": \"\", \t\t\"createdBy\": \"\", \t\t\"updatedBy\": \"\", \t\t\"deletedBy\": \"\", \t\t\"isDeleted\": \"\" \t}   }"
+},
+                       "url": {
+                           "raw": "{{appUrl}}/conversation/getByCriteria",
+                           "host": [
+                               "{{appUrl}}"
+                           ],
+                           "path": [
+                               "conversation",
+                               "getByCriteria"
+                           ]
+                       }
+                   },
+                   "response": []
+               }
+			]
+		},
+		{
+			"name": "conversationUser",
+			"item": [
+                {
+					"name": "conversationUser.create",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"conversationId\": \"\", \t\t\t\"userId\": \"\", \t\t\t\"hasLeft\": \"\", \t\t\t\"leftAt\": \"\", \t\t\t\"leftBy\": \"\", \t\t\t\"hasDefinitivelyLeft\": \"\", \t\t\t\"definitivelyLeftAt\": \"\", \t\t\t\"definitivelyLeftBy\": \"\", \t\t\t\"recreatedAt\": \"\", \t\t\t\"recreatedBy\": \"\", \t\t\t\"hasCleaned\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+						},
+						"url": {
+							"raw": "{{appUrl}}/conversationUser/create",
+							"host": [
+								"{{appUrl}}"
+							],
+							"path": [
+								"conversationUser",
+								"create"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+                    "name": "conversationUser.update",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\", \t\t\t\"conversationId\": \"\", \t\t\t\"userId\": \"\", \t\t\t\"hasLeft\": \"\", \t\t\t\"leftAt\": \"\", \t\t\t\"leftBy\": \"\", \t\t\t\"hasDefinitivelyLeft\": \"\", \t\t\t\"definitivelyLeftAt\": \"\", \t\t\t\"definitivelyLeftBy\": \"\", \t\t\t\"recreatedAt\": \"\", \t\t\t\"recreatedBy\": \"\", \t\t\t\"hasCleaned\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+                        },
+                        "url": {
+                            "raw": "{{appUrl}}/conversationUser/update",
+                            "host": [
+                                "{{appUrl}}"
+                            ],
+                            "path": [
+                                "conversationUser",
+                                "update"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                     "name": "conversationUser.delete",
+                     "request": {
+                         "method": "POST",
+                         "header": [
+                             {
+                                 "key": "Content-Type",
+                                 "value": "application/json"
+                             }
+                         ],
+                         "body": {
+                             "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\" \t\t}  \t]   }"
+                         },
+                         "url": {
+                             "raw": "{{appUrl}}/conversationUser/delete",
+                             "host": [
+                                 "{{appUrl}}"
+                             ],
+                             "path": [
+                                 "conversationUser",
+                                 "delete"
+                             ]
+                         }
+                     },
+                     "response": []
+                 },
+                 {
+                   "name": "conversationUser.getByCriteria",
+                   "request": {
+                       "method": "POST",
+                       "header": [
+                           {
+                               "key": "Content-Type",
+                               "value": "application/json"
+                           }
+                       ],
+                       "body": {
+                           "mode": "raw",
+			            "raw": "{ \t\"user\":\"1\", \t\"isSimpleLoading\":false, \t\"data\":{   \t\t\"id\": \"\", \t\t\"conversationId\": \"\", \t\t\"userId\": \"\", \t\t\"hasLeft\": \"\", \t\t\"leftAt\": \"\", \t\t\"leftBy\": \"\", \t\t\"hasDefinitivelyLeft\": \"\", \t\t\"definitivelyLeftAt\": \"\", \t\t\"definitivelyLeftBy\": \"\", \t\t\"recreatedAt\": \"\", \t\t\"recreatedBy\": \"\", \t\t\"hasCleaned\": \"\", \t\t\"createdAt\": \"\", \t\t\"updatedAt\": \"\", \t\t\"deletedAt\": \"\", \t\t\"createdBy\": \"\", \t\t\"updatedBy\": \"\", \t\t\"deletedBy\": \"\", \t\t\"isDeleted\": \"\" \t}   }"
+},
+                       "url": {
+                           "raw": "{{appUrl}}/conversationUser/getByCriteria",
+                           "host": [
+                               "{{appUrl}}"
+                           ],
+                           "path": [
+                               "conversationUser",
+                               "getByCriteria"
+                           ]
+                       }
+                   },
+                   "response": []
+               }
+			]
+		},
+		{
+			"name": "historiqueSuppressionMessage",
+			"item": [
+                {
+					"name": "historiqueSuppressionMessage.create",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"messageId\": \"\", \t\t\t\"userId\": \"\", \t\t\t\"isHidden\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+						},
+						"url": {
+							"raw": "{{appUrl}}/historiqueSuppressionMessage/create",
+							"host": [
+								"{{appUrl}}"
+							],
+							"path": [
+								"historiqueSuppressionMessage",
+								"create"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+                    "name": "historiqueSuppressionMessage.update",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\", \t\t\t\"messageId\": \"\", \t\t\t\"userId\": \"\", \t\t\t\"isHidden\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+                        },
+                        "url": {
+                            "raw": "{{appUrl}}/historiqueSuppressionMessage/update",
+                            "host": [
+                                "{{appUrl}}"
+                            ],
+                            "path": [
+                                "historiqueSuppressionMessage",
+                                "update"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                     "name": "historiqueSuppressionMessage.delete",
+                     "request": {
+                         "method": "POST",
+                         "header": [
+                             {
+                                 "key": "Content-Type",
+                                 "value": "application/json"
+                             }
+                         ],
+                         "body": {
+                             "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\" \t\t}  \t]   }"
+                         },
+                         "url": {
+                             "raw": "{{appUrl}}/historiqueSuppressionMessage/delete",
+                             "host": [
+                                 "{{appUrl}}"
+                             ],
+                             "path": [
+                                 "historiqueSuppressionMessage",
+                                 "delete"
+                             ]
+                         }
+                     },
+                     "response": []
+                 },
+                 {
+                   "name": "historiqueSuppressionMessage.getByCriteria",
+                   "request": {
+                       "method": "POST",
+                       "header": [
+                           {
+                               "key": "Content-Type",
+                               "value": "application/json"
+                           }
+                       ],
+                       "body": {
+                           "mode": "raw",
+			            "raw": "{ \t\"user\":\"1\", \t\"isSimpleLoading\":false, \t\"data\":{   \t\t\"id\": \"\", \t\t\"messageId\": \"\", \t\t\"userId\": \"\", \t\t\"isHidden\": \"\", \t\t\"createdAt\": \"\", \t\t\"updatedAt\": \"\", \t\t\"deletedAt\": \"\", \t\t\"createdBy\": \"\", \t\t\"updatedBy\": \"\", \t\t\"deletedBy\": \"\", \t\t\"isDeleted\": \"\" \t}   }"
+},
+                       "url": {
+                           "raw": "{{appUrl}}/historiqueSuppressionMessage/getByCriteria",
+                           "host": [
+                               "{{appUrl}}"
+                           ],
+                           "path": [
+                               "historiqueSuppressionMessage",
+                               "getByCriteria"
+                           ]
+                       }
+                   },
+                   "response": []
+               }
+			]
+		},
+		{
+			"name": "message",
+			"item": [
+                {
+					"name": "message.create",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"content\": \"\", \t\t\t\"imgUrl\": \"\", \t\t\t\"typeMessage\": \"\", \t\t\t\"conversationId\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+						},
+						"url": {
+							"raw": "{{appUrl}}/message/create",
+							"host": [
+								"{{appUrl}}"
+							],
+							"path": [
+								"message",
+								"create"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+                    "name": "message.update",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\", \t\t\t\"content\": \"\", \t\t\t\"imgUrl\": \"\", \t\t\t\"typeMessage\": \"\", \t\t\t\"conversationId\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+                        },
+                        "url": {
+                            "raw": "{{appUrl}}/message/update",
+                            "host": [
+                                "{{appUrl}}"
+                            ],
+                            "path": [
+                                "message",
+                                "update"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                     "name": "message.delete",
+                     "request": {
+                         "method": "POST",
+                         "header": [
+                             {
+                                 "key": "Content-Type",
+                                 "value": "application/json"
+                             }
+                         ],
+                         "body": {
+                             "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\" \t\t}  \t]   }"
+                         },
+                         "url": {
+                             "raw": "{{appUrl}}/message/delete",
+                             "host": [
+                                 "{{appUrl}}"
+                             ],
+                             "path": [
+                                 "message",
+                                 "delete"
+                             ]
+                         }
+                     },
+                     "response": []
+                 },
+                 {
+                   "name": "message.getByCriteria",
+                   "request": {
+                       "method": "POST",
+                       "header": [
+                           {
+                               "key": "Content-Type",
+                               "value": "application/json"
+                           }
+                       ],
+                       "body": {
+                           "mode": "raw",
+			            "raw": "{ \t\"user\":\"1\", \t\"isSimpleLoading\":false, \t\"data\":{   \t\t\"id\": \"\", \t\t\"content\": \"\", \t\t\"imgUrl\": \"\", \t\t\"typeMessage\": \"\", \t\t\"conversationId\": \"\", \t\t\"createdAt\": \"\", \t\t\"updatedAt\": \"\", \t\t\"deletedAt\": \"\", \t\t\"createdBy\": \"\", \t\t\"updatedBy\": \"\", \t\t\"deletedBy\": \"\", \t\t\"isDeleted\": \"\" \t}   }"
+},
+                       "url": {
+                           "raw": "{{appUrl}}/message/getByCriteria",
+                           "host": [
+                               "{{appUrl}}"
+                           ],
+                           "path": [
+                               "message",
+                               "getByCriteria"
+                           ]
+                       }
+                   },
+                   "response": []
+               }
+			]
+		},
+		{
+			"name": "typeConversation",
+			"item": [
+                {
+					"name": "typeConversation.create",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"libelle\": \"\", \t\t\t\"code\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+						},
+						"url": {
+							"raw": "{{appUrl}}/typeConversation/create",
+							"host": [
+								"{{appUrl}}"
+							],
+							"path": [
+								"typeConversation",
+								"create"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+                    "name": "typeConversation.update",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\", \t\t\t\"libelle\": \"\", \t\t\t\"code\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+                        },
+                        "url": {
+                            "raw": "{{appUrl}}/typeConversation/update",
+                            "host": [
+                                "{{appUrl}}"
+                            ],
+                            "path": [
+                                "typeConversation",
+                                "update"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                     "name": "typeConversation.delete",
+                     "request": {
+                         "method": "POST",
+                         "header": [
+                             {
+                                 "key": "Content-Type",
+                                 "value": "application/json"
+                             }
+                         ],
+                         "body": {
+                             "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\" \t\t}  \t]   }"
+                         },
+                         "url": {
+                             "raw": "{{appUrl}}/typeConversation/delete",
+                             "host": [
+                                 "{{appUrl}}"
+                             ],
+                             "path": [
+                                 "typeConversation",
+                                 "delete"
+                             ]
+                         }
+                     },
+                     "response": []
+                 },
+                 {
+                   "name": "typeConversation.getByCriteria",
+                   "request": {
+                       "method": "POST",
+                       "header": [
+                           {
+                               "key": "Content-Type",
+                               "value": "application/json"
+                           }
+                       ],
+                       "body": {
+                           "mode": "raw",
+			            "raw": "{ \t\"user\":\"1\", \t\"isSimpleLoading\":false, \t\"data\":{   \t\t\"id\": \"\", \t\t\"libelle\": \"\", \t\t\"code\": \"\", \t\t\"createdAt\": \"\", \t\t\"updatedAt\": \"\", \t\t\"deletedAt\": \"\", \t\t\"createdBy\": \"\", \t\t\"updatedBy\": \"\", \t\t\"deletedBy\": \"\", \t\t\"isDeleted\": \"\" \t}   }"
+},
+                       "url": {
+                           "raw": "{{appUrl}}/typeConversation/getByCriteria",
+                           "host": [
+                               "{{appUrl}}"
+                           ],
+                           "path": [
+                               "typeConversation",
+                               "getByCriteria"
+                           ]
+                       }
+                   },
+                   "response": []
+               }
+			]
+		},
+		{
+			"name": "typeMessage",
+			"item": [
+                {
+					"name": "typeMessage.create",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"libelle\": \"\", \t\t\t\"code\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+						},
+						"url": {
+							"raw": "{{appUrl}}/typeMessage/create",
+							"host": [
+								"{{appUrl}}"
+							],
+							"path": [
+								"typeMessage",
+								"create"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+                    "name": "typeMessage.update",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\", \t\t\t\"libelle\": \"\", \t\t\t\"code\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+                        },
+                        "url": {
+                            "raw": "{{appUrl}}/typeMessage/update",
+                            "host": [
+                                "{{appUrl}}"
+                            ],
+                            "path": [
+                                "typeMessage",
+                                "update"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                     "name": "typeMessage.delete",
+                     "request": {
+                         "method": "POST",
+                         "header": [
+                             {
+                                 "key": "Content-Type",
+                                 "value": "application/json"
+                             }
+                         ],
+                         "body": {
+                             "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\" \t\t}  \t]   }"
+                         },
+                         "url": {
+                             "raw": "{{appUrl}}/typeMessage/delete",
+                             "host": [
+                                 "{{appUrl}}"
+                             ],
+                             "path": [
+                                 "typeMessage",
+                                 "delete"
+                             ]
+                         }
+                     },
+                     "response": []
+                 },
+                 {
+                   "name": "typeMessage.getByCriteria",
+                   "request": {
+                       "method": "POST",
+                       "header": [
+                           {
+                               "key": "Content-Type",
+                               "value": "application/json"
+                           }
+                       ],
+                       "body": {
+                           "mode": "raw",
+			            "raw": "{ \t\"user\":\"1\", \t\"isSimpleLoading\":false, \t\"data\":{   \t\t\"id\": \"\", \t\t\"libelle\": \"\", \t\t\"code\": \"\", \t\t\"createdAt\": \"\", \t\t\"updatedAt\": \"\", \t\t\"deletedAt\": \"\", \t\t\"createdBy\": \"\", \t\t\"updatedBy\": \"\", \t\t\"deletedBy\": \"\", \t\t\"isDeleted\": \"\" \t}   }"
+},
+                       "url": {
+                           "raw": "{{appUrl}}/typeMessage/getByCriteria",
+                           "host": [
+                               "{{appUrl}}"
+                           ],
+                           "path": [
+                               "typeMessage",
+                               "getByCriteria"
+                           ]
+                       }
+                   },
+                   "response": []
+               }
+			]
+		},
+		{
+			"name": "user",
+			"item": [
+                {
+					"name": "user.create",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"nom\": \"\", \t\t\t\"prenoms\": \"\", \t\t\t\"login\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+						},
+						"url": {
+							"raw": "{{appUrl}}/user/create",
+							"host": [
+								"{{appUrl}}"
+							],
+							"path": [
+								"user",
+								"create"
+							]
+						}
+					},
+					"response": []
+				},
+				{
+                    "name": "user.update",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\", \t\t\t\"nom\": \"\", \t\t\t\"prenoms\": \"\", \t\t\t\"login\": \"\", \t\t\t\"deletedAt\": \"\", \t\t\t\"deletedBy\": \"\" \t\t}  \t]   }"
+                        },
+                        "url": {
+                            "raw": "{{appUrl}}/user/update",
+                            "host": [
+                                "{{appUrl}}"
+                            ],
+                            "path": [
+                                "user",
+                                "update"
+                            ]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                     "name": "user.delete",
+                     "request": {
+                         "method": "POST",
+                         "header": [
+                             {
+                                 "key": "Content-Type",
+                                 "value": "application/json"
+                             }
+                         ],
+                         "body": {
+                             "mode": "raw",
+                            "raw": "{ \t\"user\":\"1\", \t\"datas\":[ \t\t{   \t\t\t\"id\": \"\" \t\t}  \t]   }"
+                         },
+                         "url": {
+                             "raw": "{{appUrl}}/user/delete",
+                             "host": [
+                                 "{{appUrl}}"
+                             ],
+                             "path": [
+                                 "user",
+                                 "delete"
+                             ]
+                         }
+                     },
+                     "response": []
+                 },
+                 {
+                   "name": "user.getByCriteria",
+                   "request": {
+                       "method": "POST",
+                       "header": [
+                           {
+                               "key": "Content-Type",
+                               "value": "application/json"
+                           }
+                       ],
+                       "body": {
+                           "mode": "raw",
+			            "raw": "{ \t\"user\":\"1\", \t\"isSimpleLoading\":false, \t\"data\":{   \t\t\"id\": \"\", \t\t\"nom\": \"\", \t\t\"prenoms\": \"\", \t\t\"login\": \"\", \t\t\"createdAt\": \"\", \t\t\"updatedAt\": \"\", \t\t\"deletedAt\": \"\", \t\t\"createdBy\": \"\", \t\t\"updatedBy\": \"\", \t\t\"deletedBy\": \"\", \t\t\"isDeleted\": \"\" \t}   }"
+},
+                       "url": {
+                           "raw": "{{appUrl}}/user/getByCriteria",
+                           "host": [
+                               "{{appUrl}}"
+                           ],
+                           "path": [
+                               "user",
+                               "getByCriteria"
+                           ]
+                       }
+                   },
+                   "response": []
+               }
+			]
+		}
+    ]
+}

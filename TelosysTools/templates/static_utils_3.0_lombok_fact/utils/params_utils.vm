@@ -1,0 +1,52 @@
+
+/*
+ * Created on $today.date ( Time $today.time )
+ * Generator tool : $generator.name ( version $generator.version )
+ * Copyright 2018 Geo. All Rights Reserved.
+ */
+
+package ${target.javaPackageFromFolder(${SRC})};
+
+
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.ToString;
+import org.apache.commons.lang3.BooleanUtils;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+import org.springframework.lang.NonNull;
+
+/**
+ * Params Utils
+ *
+ * @author Geo
+ * update by ziet
+ */
+
+@Component
+@Getter
+@NoArgsConstructor
+@ToString
+public class ParamsUtils {
+    //vous devez rajouté l'annotation @Value("${}") pour chaque
+    //propriété déclaré dans la classe ParamsUtils; les variables ont été définit dans properties au préalable
+    @Value("${}")
+	private String apacheRootFilesPath;
+	@Value("${}")
+	private String  rootFilesPath;
+    @Value("${}")
+    private String apacheRootUrl;
+
+
+    public String getFullDirectory(@NonNull String path) {
+        String rootPath = getRootFilesPath();
+        return Utilities.createFullPath(rootPath, path);
+    }
+
+	public String getFullImageDirectory(boolean useApachePath) {
+        String rootPath = useApachePath ? getApacheRootFilesPath() : getRootFilesPath();
+        return Utilities.createFullPath(rootPath, "");
+    }
+}
+
+

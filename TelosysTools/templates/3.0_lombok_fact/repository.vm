@@ -1,0 +1,66 @@
+##-------------------------------------------------------------------------------------------------------
+## JPA beans suffix
+#set ( $env.entityClassNameSuffix = "" )
+#set ( $listOfForeignAttrib = ["code", "name", "firstName", "lastName", "libelle", "intitule", "login", "nom", "prenoms", "prenom", "denomination", "codeGroupe", "libelleGroupe", "raisonSociale", "ref"])
+#set ( $listOfUNiqueAttrib = ["code", "name", "libelle", "intitule", "login", "userName", "email", "numero", "telephone", "matricule", "numeroBagde", "badge", "denomination"])
+##-------------------------------------------------------------------------------------------------------
+#if( $entity.hasCompositePrimaryKey() )
+#set( $entityKeyType = ${entity.name} + "EntityKey" )
+#else
+#if($entity.keyAttributesCount > 0)
+#set( $entityKeyType = ${entity.keyAttributes[0].formattedType(0)} )
+#end
+#if($entity.keyAttributesCount <= 0)
+#set( $entityKeyType = "Integer" )
+#end
+#end
+
+#set ( $roleEntity = "Profil" )
+#set ( $functionalityEntity = "Functionality" )
+#set ( $roleFunctionalityEntity = "ProfilFunctionality" )
+#set ( $roleFunctionalityRepositoryName = "ProfilFunctionality" + "Repository" )
+#set ( $roleFunctionalityRepositoryFieldName = $fn.uncapitalize(${roleFunctionalityRepositoryName}) )
+
+##-------------------------------------------------------------------------------------------------------
+package ${target.javaPackageFromFolder(${SRC})};
+
+#foreach( $import in $java.imports($entity) )
+import $import;
+#end
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
+import java.util.HashMap;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
+import java.util.Locale;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.TypedQuery;
+
+import org.springframework.dao.DataAccessException;
+import org.springframework.data.domain.Sort.Direction;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+
+import ${ROOT_PKG}.utils.*;
+import ${ROOT_PKG}.utils.dto.*;
+import ${ROOT_PKG}.utils.contract.*;
+import ${ROOT_PKG}.utils.contract.Request;
+import ${ROOT_PKG}.utils.contract.Response;
+import ${ENTITY_PKG}.*;
+#if ( $entity.hasCompositePrimaryKey() )
+import ${ENTITY_PKG}.${entityKeyType};
+#end
+import ${ROOT_PKG}.dao.repository.base._${entity.name}Repository;
+
+/**
+ * Repository : ${entity.name}.
+ *
+ * @author Geo
+ */
+@Repository
+public interface ${entity.name}Repository extends JpaRepository<${entity.name}, ${entityKeyType}>, _${entity.name}Repository {
+
+}
