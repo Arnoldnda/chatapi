@@ -11,6 +11,9 @@ package ci.orange.chatapi.business;
 import lombok.extern.java.Log;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.PermissionDeniedDataAccessException;
 import org.springframework.stereotype.Component;
 
 import jakarta.persistence.EntityManager;
@@ -21,8 +24,6 @@ import java.util.*;
 
 import ci.orange.chatapi.utils.*;
 import ci.orange.chatapi.utils.dto.*;
-import ci.orange.chatapi.utils.enums.*;
-import ci.orange.chatapi.utils.contract.*;
 import ci.orange.chatapi.utils.contract.IBasicBusiness;
 import ci.orange.chatapi.utils.contract.Request;
 import ci.orange.chatapi.utils.contract.Response;
@@ -30,8 +31,8 @@ import ci.orange.chatapi.utils.dto.transformer.*;
 import ci.orange.chatapi.dao.entity.ConversationUser;
 import ci.orange.chatapi.dao.entity.User;
 import ci.orange.chatapi.dao.entity.Conversation;
-import ci.orange.chatapi.dao.entity.*;
 import ci.orange.chatapi.dao.repository.*;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
 BUSINESS for table "conversation_user"
@@ -66,8 +67,191 @@ public class ConversationUserBusiness implements IBasicBusiness<Request<Conversa
 		dateFormat = new SimpleDateFormat("dd/MM/yyyy");
 		dateTimeFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 	}
-	
-	/**
+
+
+    /**
+     * add user in conversation by using ConversationUserDto as object.
+     *
+     * @param request
+     * @return response
+     *
+     */
+    @Transactional(rollbackFor = {RuntimeException.class, Exception.class})
+    public Response<ConversationUserDto> addUserToGroup(Request<ConversationUserDto> request, Locale locale)  throws ParseException {
+        Response<ConversationUserDto> response = new Response<ConversationUserDto>();
+        try {
+            log.info("----begin create ConversationUser-----");
+            List<ConversationUser>        items    = new ArrayList<ConversationUser>();
+
+            for (ConversationUserDto dto : request.getDatas()) {
+                // Definir les parametres obligatoires
+                Map<String, java.lang.Object> fieldsToVerify = new HashMap<String, java.lang.Object>();
+                fieldsToVerify.put("conversationId", dto.getConversationId());
+                fieldsToVerify.put("userId", dto.getUserId());
+
+                if (!Validate.RequiredValue(fieldsToVerify).isGood()) {
+                    response.setStatus(functionalError.FIELD_EMPTY(Validate.getValidate().getField(), locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                Integer actorId  = request.getUser();
+
+              //  vérifier que l'acteur existe
+                User actor = userRepository.findOne(actorId, false);
+                if (actor == null) {
+                    response.setStatus(functionalError.DATA_NOT_EXIST("Utilisateur inexistant : " + actorId, locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // Verify if conversation exist
+                Conversation existingConversation = null;
+                existingConversation = conversationRepository.findOne(dto.getConversationId(), false);
+                if (existingConversation == null) {
+                    response.setStatus(functionalError.DATA_NOT_EXIST("Cette conversation n'existe pas." + dto.getConversationId(), locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // verifier que la conversation est un group
+                if (Utilities.areNotEquals(existingConversation.getTypeConversation().getCode(), "GROUP")) {
+                    response.setStatus(functionalError.REQUEST_ERROR("Ajout de membre autorisé uniquement pour les groupes", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // verifier que l'acteur est un membre actif de la conversation
+                ConversationUser actorMembership = conversationUserRepository.findActiveUserInConversation(
+                        existingConversation.getId(), actorId);
+                if (actorMembership == null) {
+                    response.setStatus(functionalError.UNAUTHORIZED("Vous n'êtes pas membre actif de ce groupe", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                //  verifier que l'acteur est un admin
+                if (!Utilities.isTrue(actorMembership.getRole())) {
+                    response.setStatus(functionalError.UNAUTHORIZED("Seuls les administrateurs peuvent ajouter des membres", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // verifier qu'on ne s'ajoute pas soit même
+                if (Utilities.areEquals(actorId, dto.getUserId())) {
+                    response.setStatus(functionalError.REQUEST_ERROR("Impossible de s'ajouter soi-même", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // Verify if user exist
+                User existingUser = null;
+                existingUser = userRepository.findOne(dto.getUserId(), false);
+                if (existingUser == null) {
+                    response.setStatus(functionalError.DATA_NOT_EXIST("Utilisateur à ajouté inexistant." + dto.getUserId(), locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // Historique du participant
+                ConversationUser existing = conversationUserRepository.findByConversation_IdAndUser_IdAndIsDeletedFalse(
+                        existingConversation.getId(), existingUser.getId());
+
+                // verifier si le user à déja quitté la conversation pour faire une réintégration
+                if (existing != null ) {
+                    // verifier s'il a pas quitté le groupe
+                    if (!Utilities.isTrue(existing.getHasLeft())) {
+                        response.setStatus(functionalError.REQUEST_ERROR("Utilisateur déjà membre du groupe", locale));
+                        response.setHasError(true);
+                        return response;
+                    }
+
+                    // verifier s'il a définitivement quitté le groupe
+                    if (Utilities.isTrue(existing.getHasDefinitivelyLeft())) {
+                        response.setStatus(functionalError.REQUEST_ERROR(
+                                "Cet utilisateur a quitté définitivement le groupe", locale));
+                        response.setHasError(true);
+                        return response;
+                    }
+
+                    // Réintégration
+                    existing.setHasLeft(false);
+                    existing.setRecreatedAt(Utilities.getCurrentDate());
+                    existing.setRecreatedBy(actorId);
+                    existing.setUpdatedAt(Utilities.getCurrentDate());
+                    existing.setUpdatedBy(actorId);
+                    existing.setIsDeleted(false);
+                    items.add(existing);
+
+                } else {
+                    //Nouveau membre
+                    ConversationUser entityToSave = null;
+                    entityToSave = ConversationUserTransformer.INSTANCE.toEntity(dto, existingUser, existingConversation);
+                    entityToSave.setRole(false);
+                    entityToSave.setCreatedAt(Utilities.getCurrentDate());
+                    entityToSave.setCreatedBy(request.getUser());
+                    entityToSave.setIsDeleted(false);
+                    entityToSave.setHasLeft(false);
+                    entityToSave.setHasDefinitivelyLeft(false);
+                    entityToSave.setHasCleaned(false);
+                    items.add(entityToSave);
+                }
+            }
+
+            if (!items.isEmpty()) {
+                List<ConversationUser> itemsSaved = null;
+                // inserer les donnees en base de donnees
+                itemsSaved = conversationUserRepository.saveAll((Iterable<ConversationUser>) items);
+                if (itemsSaved == null) {
+                    response.setStatus(functionalError.SAVE_FAIL("conversationUser", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+                List<ConversationUserDto> itemsDto = (Utilities.isTrue(request.getIsSimpleLoading())) ? ConversationUserTransformer.INSTANCE.toLiteDtos(itemsSaved) : ConversationUserTransformer.INSTANCE.toDtos(itemsSaved);
+
+                final int size = itemsSaved.size();
+                List<String>  listOfError      = Collections.synchronizedList(new ArrayList<String>());
+                itemsDto.parallelStream().forEach(dto -> {
+                    try {
+                        dto = getFullInfos(dto, size, request.getIsSimpleLoading(), locale);
+                    } catch (Exception e) {
+                        listOfError.add(e.getMessage());
+                        e.printStackTrace();
+                    }
+                });
+                if (Utilities.isNotEmpty(listOfError)) {
+                    Object[] objArray = listOfError.stream().distinct().toArray();
+                    throw new RuntimeException(StringUtils.join(objArray, ", "));
+                }
+                response.setItems(itemsDto);
+                response.setHasError(false);
+            }
+
+            log.info("----end create ConversationUser-----");
+            return response;
+
+        } catch (PermissionDeniedDataAccessException e) {
+            exceptionUtils.PERMISSION_DENIED_DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (DataAccessResourceFailureException e) {
+            exceptionUtils.DATA_ACCESS_RESOURCE_FAILURE_EXCEPTION(response, locale, e);
+        } catch (DataAccessException e) {
+            exceptionUtils.DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (RuntimeException e) {
+            exceptionUtils.RUNTIME_EXCEPTION(response, locale, e);
+        } catch (Exception e) {
+            exceptionUtils.EXCEPTION(response, locale, e);
+        } finally {
+            if (response.isHasError() && response.getStatus() != null) {
+                log.info(String.format("Erreur| code: {} -  message: {}", response.getStatus().getCode(), response.getStatus().getMessage()));
+                throw new RuntimeException(response.getStatus().getCode() + ";" + response.getStatus().getMessage());
+            }
+        }
+
+        return response;
+    }
+
+
+    /**
 	 * create ConversationUser by using ConversationUserDto as object.
 	 * 
 	 * @param request
@@ -88,59 +272,77 @@ public class ConversationUserBusiness implements IBasicBusiness<Request<Conversa
 			fieldsToVerify.put("userId", dto.getUserId());
             fieldsToVerify.put("role", dto.getRole());
 
-//			fieldsToVerify.put("hasLeft", dto.getHasLeft());
-//			fieldsToVerify.put("leftAt", dto.getLeftAt());
-//			fieldsToVerify.put("leftBy", dto.getLeftBy());
-//			fieldsToVerify.put("hasDefinitivelyLeft", dto.getHasDefinitivelyLeft());
-//			fieldsToVerify.put("definitivelyLeftAt", dto.getDefinitivelyLeftAt());
-//			fieldsToVerify.put("definitivelyLeftBy", dto.getDefinitivelyLeftBy());
-//			fieldsToVerify.put("recreatedAt", dto.getRecreatedAt());
-//			fieldsToVerify.put("recreatedBy", dto.getRecreatedBy());
-//			fieldsToVerify.put("hasCleaned", dto.getHasCleaned());
-//			fieldsToVerify.put("deletedAt", dto.getDeletedAt());
-//			fieldsToVerify.put("deletedBy", dto.getDeletedBy());
 			if (!Validate.RequiredValue(fieldsToVerify).isGood()) {
 				response.setStatus(functionalError.FIELD_EMPTY(Validate.getValidate().getField(), locale));
 				response.setHasError(true);
 				return response;
 			}
 
-			// Verify if conversationUser to insert do not exist
-			ConversationUser existingEntity = null;
+            // Verify if conversation exist
+            Conversation existingConversation = null;
+            existingConversation = conversationRepository.findOne(dto.getConversationId(), false);
+            if (existingConversation == null) {
+                response.setStatus(functionalError.DATA_NOT_EXIST("Cette conversation n'existe pas." + dto.getConversationId(), locale));
+                response.setHasError(true);
+                return response;
+            }
 
-/*
-			if (existingEntity != null) {
-				response.setStatus(functionalError.DATA_EXIST("conversationUser id -> " + dto.getId(), locale));
-				response.setHasError(true);
-				return response;
-			}
+            // verifier si elle est prive
+            if (Utilities.areEquals(existingConversation.getTypeConversation().getCode(), "PRIVATE")) {
+                response.setStatus(functionalError.UNAUTHORIZED("Impossible d'ajouter un menbre. Cette conversation est privé ", locale));
+                response.setHasError(true);
+                return response;
+            }
 
-*/
 			// Verify if user exist
 			User existingUser = null;
-			if (dto.getUserId() != null && dto.getUserId() > 0){
-				existingUser = userRepository.findOne(dto.getUserId(), false);
-				if (existingUser == null) {
-					response.setStatus(functionalError.DATA_NOT_EXIST("user userId -> " + dto.getUserId(), locale));
-					response.setHasError(true);
-					return response;
-				}
-			}
-			// Verify if conversation exist
-			Conversation existingConversation = null;
-			if (dto.getConversationId() != null && dto.getConversationId() > 0){
-				existingConversation = conversationRepository.findOne(dto.getConversationId(), false);
-				if (existingConversation == null) {
-					response.setStatus(functionalError.DATA_NOT_EXIST("conversation conversationId -> " + dto.getConversationId(), locale));
-					response.setHasError(true);
-					return response;
-				}
-			}
-				ConversationUser entityToSave = null;
+            existingUser = userRepository.findOne(dto.getUserId(), false);
+            if (existingUser == null) {
+                response.setStatus(functionalError.DATA_NOT_EXIST("Ce utilisateur n'existe pas." + dto.getUserId(), locale));
+                response.setHasError(true);
+                return response;
+            }
+
+
+            // Vérifier que l'acteur est membre de la conversation
+            ConversationUser conversationMember = conversationUserRepository.findByConversation_IdAndUser_IdAndIsDeletedFalse(
+                    dto.getConversationId(), request.getUser()
+            );
+            if (conversationMember == null) {
+                response.setStatus(functionalError.DISALLOWED_OPERATION(
+                        "L'acteur n'est pas membre de la conversation", locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            // verifier que l'acteur est admin
+            if(!conversationMember.getRole()) {
+                response.setStatus(functionalError.DISALLOWED_OPERATION(
+                        "seul un administrateur peut ajouter un membre", locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            // verifier si l'utlisateur existe déja dans cette conversation
+            ConversationUser conversationMemberUser = conversationUserRepository.findByConversation_IdAndUser_IdAndIsDeletedFalse(
+                    dto.getConversationId(), dto.getUserId()
+            );
+            if (conversationMemberUser != null) {
+                response.setStatus(functionalError.DISALLOWED_OPERATION(
+                        "Ce utilisateur existe déja dans le conversation", locale));
+                response.setHasError(true);
+                return response;
+            }
+
+
+            ConversationUser entityToSave = null;
 			entityToSave = ConversationUserTransformer.INSTANCE.toEntity(dto, existingUser, existingConversation);
 			entityToSave.setCreatedAt(Utilities.getCurrentDate());
 			entityToSave.setCreatedBy(request.getUser());
 			entityToSave.setIsDeleted(false);
+            entityToSave.setHasLeft(false);
+            entityToSave.setHasDefinitivelyLeft(false);
+            entityToSave.setHasCleaned(false);
 			items.add(entityToSave);
 		}
 
