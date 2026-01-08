@@ -2,15 +2,11 @@
 
 package ci.orange.chatapi.dao.repository;
 
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.HashMap;
 import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Locale;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 
@@ -48,7 +44,7 @@ public interface ConversationRepository extends JpaRepository<Conversation, Inte
     GROUP BY c.id
     HAVING COUNT(DISTINCT cu.user.id) = 2
     """)
-    List<Conversation> findExistingPrivateConversation(
+    Optional<Conversation> findExistingPrivateConversation(
             @Param("user1") Integer Creator,
             @Param("user2") Integer participant
     );

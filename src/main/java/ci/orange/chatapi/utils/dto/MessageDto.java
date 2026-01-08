@@ -32,6 +32,7 @@ import ci.orange.chatapi.utils.dto.base._MessageDto;
 public class MessageDto extends _MessageDto{
 
     private String    statusLibelle               ;
+    private Integer  receiverId                   ;
     
 	//----------------------------------------------------------------------
     // clone METHOD

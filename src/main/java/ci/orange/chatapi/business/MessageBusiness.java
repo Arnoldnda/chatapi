@@ -11,7 +11,6 @@ package ci.orange.chatapi.business;
 import lombok.extern.java.Log;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.PermissionDeniedDataAccessException;
@@ -29,8 +28,6 @@ import java.util.*;
 
 import ci.orange.chatapi.utils.*;
 import ci.orange.chatapi.utils.dto.*;
-import ci.orange.chatapi.utils.enums.*;
-import ci.orange.chatapi.utils.contract.*;
 import ci.orange.chatapi.utils.contract.IBasicBusiness;
 import ci.orange.chatapi.utils.contract.Request;
 import ci.orange.chatapi.utils.contract.Response;
@@ -63,6 +60,8 @@ public class MessageBusiness implements IBasicBusiness<Request<MessageDto>, Resp
     private UserRepository userRepository;
     @Autowired
 	private ConversationRepository conversationRepository;
+    @Autowired
+    private TypeConversationRepository typeConversationRepository ;
 	@Autowired
 	private TypeMessageRepository typeMessage2Repository;
 	@Autowired
@@ -97,6 +96,192 @@ public class MessageBusiness implements IBasicBusiness<Request<MessageDto>, Resp
     public Response<MessageDto> sendPrivateMessage(Request<MessageDto> request, Locale locale)  throws ParseException {
         Response<MessageDto> response = new Response<MessageDto>();
         try {
+            log.info("----begin sendPrivateMessage-----");
+
+            List<Message>        items    = new ArrayList<Message>();
+
+            for (MessageDto dto : request.getDatas()) {
+                // Definir les parametres obligatoires
+                Map<String, java.lang.Object> fieldsToVerify = new HashMap<String, java.lang.Object>();
+
+                fieldsToVerify.put("typeMessageCode", dto.getTypeMessageCode());
+                fieldsToVerify.put("receiverId", dto.getReceiverId());
+
+                // si le message est de type text le champ content est obligatoire
+                if (Utilities.areEquals(dto.getTypeMessageCode(), "TEXT")) fieldsToVerify.put("content", dto.getContent());
+                // si le message est de type image l'url de l'image est obligatoire
+                if (Utilities.areEquals(dto.getTypeMessageCode(), "IMAGE")) fieldsToVerify.put("imgUrl", dto.getImgUrl());
+                // si le message est de type mixte les deux champs sont obligatoires
+                if (Utilities.areEquals(dto.getTypeMessageCode(), "MIXED")) {
+                    fieldsToVerify.put("content", dto.getContent());
+                    fieldsToVerify.put("imgUrl", dto.getImgUrl());
+                }
+
+                if (!Validate.RequiredValue(fieldsToVerify).isGood()) {
+                    response.setStatus(functionalError.FIELD_EMPTY(Validate.getValidate().getField(), locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+
+                /*
+                    Vérification metier
+                */
+                Integer actorId = request.getUser();
+                Integer receiverId = dto.getReceiverId();
+
+                // Verifier que l'utilisateur qui mène l'acton existe bien.
+                // Verifier que l'utilisateur qui est censé recevoir le message
+                User actor = userRepository.findOne(actorId, false);
+                User receiver = userRepository.findOne(receiverId, false);
+                if (actor == null || receiver == null ) {
+                    response.setStatus(functionalError.DATA_NOT_EXIST(
+                            "Ce utilisateur n'existe pas. UserId : " + request.getUser(), locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // verifier que celui qui envoi le message est différent de celui qui le reçoi
+                if (Utilities.areEquals(actorId, receiverId)) {
+                    response.setStatus(functionalError.REQUEST_ERROR(
+                            "Impossible d'envoyer un message à soi-même. SenderId : " + request.getUser() + " ReceiverId : " + receiverId
+                            , locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // verifier que le type de message est valide
+                TypeMessage existingTypeMessage = typeMessage2Repository.findByCode(dto.getTypeMessageCode(), false);
+                if (existingTypeMessage == null ) {
+                    response.setStatus(functionalError.REQUEST_ERROR(
+                            "Le Type de message invalide. Autorisé : TEXT, IMAGE, MIXED " + request.getUser(), locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // se rassurer de l'existance de l'image upload
+                if (Utilities.areEquals(dto.getTypeMessageCode(), "IMAGE") || Utilities.areEquals(dto.getTypeMessageCode(), "MIXED")) {
+
+                    // verifier que l'url viens de nous
+                    if (!dto.getImgUrl().startsWith( paramsUtils.getBaseUrl())) {
+                        response.setStatus(functionalError.REQUEST_ERROR( "Cette url n'est pas correct" ,  locale));
+                        response.setHasError(true);
+                        return response;
+                    }
+
+                    // verifier que le fichier existe vraiment
+                    Path filePath = Paths.get(
+                            paramsUtils.getBaseUploadPath(),
+                            "messages",
+                            Utilities.extractFileName(dto.getImgUrl())
+                    );
+                    if (!Files.exists(filePath)) {
+                        response.setStatus(functionalError.REQUEST_FAIL( "Ce fichier n'existe pas." ,  locale));
+                        response.setHasError(true);
+                        return response;
+                    }
+
+                }
+
+                //  verifier si il existe déja une conversation privé entre eux .
+                // recupéré la conversaion
+                Conversation existingConversation = null;
+                Optional<Conversation> existingPrivateConversation = conversationRepository.findExistingPrivateConversation(actorId, receiverId);
+                if (existingPrivateConversation.isEmpty()) {
+
+                    log.info("Création d'une nouvelle conversation privée");
+
+                    TypeConversation typePrivateConversation = typeConversationRepository.findByCode("PRIVATE", false);
+                    if (typePrivateConversation == null) {
+                        response.setStatus(functionalError.DATA_NOT_EXIST(
+                                "Type PRIVATE non trouvé dans la base", locale));
+                        response.setHasError(true);
+                        return response;
+                    }
+
+                    // Créer la conversation
+                    Conversation newConversation = new Conversation();
+                    newConversation.setTitre("PRIVATE"); // géré dynamiquement côté front, par rapport à l'utilisateur connecté
+                    newConversation.setTypeConversation(typePrivateConversation);
+                    newConversation.setCreatedAt(Utilities.getCurrentDate());
+                    newConversation.setCreatedBy(actorId);
+                    newConversation.setIsDeleted(false);
+
+                    existingConversation = conversationRepository.save(newConversation);
+
+                    // Ajouter les deux participants
+                    ConversationUser participant1 = new ConversationUser();
+                    participant1.setConversation(existingConversation);
+                    participant1.setUser(actor);
+                    participant1.setHasLeft(false);
+                    participant1.setHasDefinitivelyLeft(false);
+                    participant1.setHasCleaned(false);
+                    participant1.setIsDeleted(false);
+                    participant1.setRole(false);
+                    participant1.setCreatedAt(Utilities.getCurrentDate());
+                    participant1.setCreatedBy(actorId);
+
+                    ConversationUser participant2 = new ConversationUser();
+                    participant2.setConversation(existingConversation);
+                    participant2.setUser(receiver);
+                    participant2.setHasLeft(false);
+                    participant2.setHasDefinitivelyLeft(false);
+                    participant2.setHasCleaned(false);
+                    participant2.setIsDeleted(false);
+                    participant2.setRole(false);
+                    participant2.setCreatedAt(Utilities.getCurrentDate());
+                    participant2.setCreatedBy(actorId);
+
+                    conversationUserRepository.saveAll(Arrays.asList(participant1, participant2));
+
+                    log.info("Conversation privée créée avec succès: " +  existingConversation.getId());
+
+                } else {
+                        existingConversation = existingPrivateConversation.get() ;
+                }
+
+                // assigné l'id de la conversation dans le message
+                dto.setConversationId(existingConversation.getId());
+
+                Message entityToSave = null;
+                entityToSave = MessageTransformer.INSTANCE.toEntity(dto, existingConversation, existingTypeMessage);
+                entityToSave.setCreatedAt(Utilities.getCurrentDate());
+                entityToSave.setCreatedBy(request.getUser());
+                entityToSave.setIsDeleted(false);
+                items.add(entityToSave);
+            }
+
+            if (!items.isEmpty()) {
+                List<Message> itemsSaved = null;
+                // inserer les donnees en base de donnees
+                itemsSaved = messageRepository.saveAll((Iterable<Message>) items);
+                if (itemsSaved == null) {
+                    response.setStatus(functionalError.SAVE_FAIL("message", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+                List<MessageDto> itemsDto = (Utilities.isTrue(request.getIsSimpleLoading())) ? MessageTransformer.INSTANCE.toLiteDtos(itemsSaved) : MessageTransformer.INSTANCE.toDtos(itemsSaved);
+
+                final int size = itemsSaved.size();
+                List<String>  listOfError      = Collections.synchronizedList(new ArrayList<String>());
+                itemsDto.parallelStream().forEach(dto -> {
+                    try {
+                        dto = getFullInfos(dto, size, request.getIsSimpleLoading(), locale);
+                    } catch (Exception e) {
+                        listOfError.add(e.getMessage());
+                        e.printStackTrace();
+                    }
+                });
+                if (Utilities.isNotEmpty(listOfError)) {
+                    Object[] objArray = listOfError.stream().distinct().toArray();
+                    throw new RuntimeException(StringUtils.join(objArray, ", "));
+                }
+                response.setItems(itemsDto);
+                response.setHasError(false);
+            }
+
+            log.info("----end sendPrivateMessage-----");
+            return response;
 
         } catch (PermissionDeniedDataAccessException e) {
             exceptionUtils.PERMISSION_DENIED_DATA_ACCESS_EXCEPTION(response, locale, e);
