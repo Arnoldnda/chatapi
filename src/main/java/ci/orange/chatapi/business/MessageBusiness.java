@@ -302,7 +302,179 @@ public class MessageBusiness implements IBasicBusiness<Request<MessageDto>, Resp
         return response;
     }
 
-	
+
+    /**
+     * send group message by using MessageDto as object.
+     *
+     * @param request
+     * @return response
+     *
+     */
+    @Transactional(rollbackFor = {RuntimeException.class, Exception.class})
+    public Response<MessageDto> sendGroupMessage(Request<MessageDto> request, Locale locale)  throws ParseException {
+        Response<MessageDto> response = new Response<MessageDto>();
+        try {
+            log.info("----begin sendGroupMessage-----");
+            List<Message>        items    = new ArrayList<Message>();
+
+            for (MessageDto dto : request.getDatas()) {
+                // Definir les parametres obligatoires
+                Map<String, java.lang.Object> fieldsToVerify = new HashMap<String, java.lang.Object>();
+
+                fieldsToVerify.put("typeMessageCode", dto.getTypeMessageCode());
+                fieldsToVerify.put("conversationId", dto.getConversationId());
+
+                // si le message est de type text le champ content est obligatoire
+                if (Utilities.areEquals(dto.getTypeMessageCode(), "TEXT")) fieldsToVerify.put("content", dto.getContent());
+                // si le message est de type image l'url de l'image est obligatoire
+                if (Utilities.areEquals(dto.getTypeMessageCode(), "IMAGE")) fieldsToVerify.put("imgUrl", dto.getImgUrl());
+                // si le message est de type mixte les deux champs sont obligatoires
+                if (Utilities.areEquals(dto.getTypeMessageCode(), "MIXED")) {
+                    fieldsToVerify.put("content", dto.getContent());
+                    fieldsToVerify.put("imgUrl", dto.getImgUrl());
+                }
+
+                if (!Validate.RequiredValue(fieldsToVerify).isGood()) {
+                    response.setStatus(functionalError.FIELD_EMPTY(Validate.getValidate().getField(), locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                Integer actorId = request.getUser();
+
+                // verifier que l'utilisateur existe bien.
+                User actor = userRepository.findOne(actorId, false);
+                if (actor == null ) {
+                    response.setStatus(functionalError.DATA_NOT_EXIST(
+                            "Ce utilisateur n'existe pas. UserId : " + request.getUser(), locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // verifier que le type de message est valide
+                TypeMessage existingTypeMessage = typeMessage2Repository.findByCode(dto.getTypeMessageCode(), false);
+                if (existingTypeMessage == null ) {
+                    response.setStatus(functionalError.REQUEST_ERROR(
+                            "Le Type de message invalide. Autorisé : TEXT, IMAGE, MIXED " + request.getUser(), locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // verifier que la conversation existe
+                Conversation existingConversation = conversationRepository.findOne(dto.getConversationId(),false);
+                if (existingConversation == null ) {
+                    response.setStatus(functionalError.DATA_NOT_EXIST(
+                            "Cette conversation n'existe pas. ConversationId : " + dto.getConversationId(),
+                            locale)
+                    );
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // verifier que la conversation est de type groupe
+                if (Utilities.areNotEquals(existingConversation.getTypeConversation().getCode(), "GROUP")) {
+                    response.setStatus(functionalError.REQUEST_ERROR(
+                            "Cette conversation n'est pas de type GROUP", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // verifier que l'utilisateur existe dans la conversation
+                ConversationUser conversationUser = conversationUserRepository.findActiveUserInConversation(
+                        dto.getConversationId(), request.getUser());
+                if (conversationUser == null ) {
+                    response.setStatus(functionalError.UNAUTHORIZED(
+                            "Vous n'êtes pas membre de cette conversation. ConversationId : " + dto.getConversationId(),
+                            locale)
+                    );
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // Vérifier l'existence de l'image si nécessaire
+                if (Utilities.areEquals(dto.getTypeMessageCode(), "IMAGE") || Utilities.areEquals(dto.getTypeMessageCode(), "MIXED")) {
+
+                    // verifier que l'url viens de nous
+                    if (!dto.getImgUrl().startsWith( paramsUtils.getBaseUrl())) {
+                        response.setStatus(functionalError.REQUEST_ERROR( "Cette url n'est pas correct" ,  locale));
+                        response.setHasError(true);
+                        return response;
+                    }
+
+                    // verifier que le fichier existe vraiment
+                    Path filePath = Paths.get(
+                            paramsUtils.getBaseUploadPath(),
+                            "messages",
+                            Utilities.extractFileName(dto.getImgUrl())
+                    );
+                    if (!Files.exists(filePath)) {
+                        response.setStatus(functionalError.REQUEST_FAIL( "Ce fichier n'existe pas." ,  locale));
+                        response.setHasError(true);
+                        return response;
+                    }
+
+                }
+
+                Message entityToSave = null;
+                entityToSave = MessageTransformer.INSTANCE.toEntity(dto, existingConversation, existingTypeMessage);
+                entityToSave.setCreatedAt(Utilities.getCurrentDate());
+                entityToSave.setCreatedBy(request.getUser());
+                entityToSave.setIsDeleted(false);
+                items.add(entityToSave);
+            }
+
+            if (!items.isEmpty()) {
+                List<Message> itemsSaved = null;
+                // inserer les donnees en base de donnees
+                itemsSaved = messageRepository.saveAll((Iterable<Message>) items);
+                if (itemsSaved == null) {
+                    response.setStatus(functionalError.SAVE_FAIL("message", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+                List<MessageDto> itemsDto = (Utilities.isTrue(request.getIsSimpleLoading())) ? MessageTransformer.INSTANCE.toLiteDtos(itemsSaved) : MessageTransformer.INSTANCE.toDtos(itemsSaved);
+
+                final int size = itemsSaved.size();
+                List<String>  listOfError      = Collections.synchronizedList(new ArrayList<String>());
+                itemsDto.parallelStream().forEach(dto -> {
+                    try {
+                        dto = getFullInfos(dto, size, request.getIsSimpleLoading(), locale);
+                    } catch (Exception e) {
+                        listOfError.add(e.getMessage());
+                        e.printStackTrace();
+                    }
+                });
+                if (Utilities.isNotEmpty(listOfError)) {
+                    Object[] objArray = listOfError.stream().distinct().toArray();
+                    throw new RuntimeException(StringUtils.join(objArray, ", "));
+                }
+                response.setItems(itemsDto);
+                response.setHasError(false);
+            }
+
+            log.info("----end sendGroupMessage-----");
+            return response;
+
+        } catch (PermissionDeniedDataAccessException e) {
+            exceptionUtils.PERMISSION_DENIED_DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (DataAccessResourceFailureException e) {
+            exceptionUtils.DATA_ACCESS_RESOURCE_FAILURE_EXCEPTION(response, locale, e);
+        } catch (DataAccessException e) {
+            exceptionUtils.DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (RuntimeException e) {
+            exceptionUtils.RUNTIME_EXCEPTION(response, locale, e);
+        } catch (Exception e) {
+            exceptionUtils.EXCEPTION(response, locale, e);
+        } finally {
+            if (response.isHasError() && response.getStatus() != null) {
+                log.info(String.format("Erreur| code: {} -  message: {}", response.getStatus().getCode(), response.getStatus().getMessage()));
+                throw new RuntimeException(response.getStatus().getCode() + ";" + response.getStatus().getMessage());
+            }
+        }
+
+        return response;
+    }
+
 	/**
 	 * create Message by using MessageDto as object.
 	 * 

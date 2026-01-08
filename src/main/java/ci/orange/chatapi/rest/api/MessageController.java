@@ -98,6 +98,41 @@ public class MessageController {
         return response;
     }
 
+    @RequestMapping(value="/group/send",method=RequestMethod.POST,consumes = {"application/json"},produces={"application/json"})
+    public Response<MessageDto> sendGroupMessage(@RequestBody Request<MessageDto> request) {
+        log.info("start method /message/group/send");
+
+        Response<MessageDto> response   = new Response<MessageDto>();
+        String        languageID = (String) requestBasic.getAttribute("CURRENT_LANGUAGE_IDENTIFIER");
+        Locale        locale     = new Locale(languageID, "");
+
+        try {
+            response = Validate.validateList(request, response, functionalError, locale);
+            if (!response.isHasError()) {
+                response = messageBusiness.sendGroupMessage(request, locale);
+            } else {
+                log.info(String.format("Erreur| code: {} -  message: {}", response.getStatus().getCode(), response.getStatus().getMessage()));
+                return response;
+            }
+            if (!response.isHasError()) {
+                log.info(String.format("code: {} -  message: {}", StatusCode.SUCCESS, StatusMessage.SUCCESS));
+            } else {
+                log.info(String.format("Erreur| code: {} -  message: {}", response.getStatus().getCode(), response.getStatus().getMessage()));
+            }
+        } catch (CannotCreateTransactionException e) {
+            exceptionUtils.CANNOT_CREATE_TRANSACTION_EXCEPTION(response, locale, e);
+        } catch (TransactionSystemException e) {
+            exceptionUtils.TRANSACTION_SYSTEM_EXCEPTION(response, locale, e);
+        } catch (RuntimeException e) {
+            exceptionUtils.RUNTIME_EXCEPTION(response, locale, e);
+        } catch (Exception e) {
+            exceptionUtils.EXCEPTION(response, locale, e);
+        }
+
+        log.info("end method /message/group/send");
+        return response;
+    }
+
 	@RequestMapping(value="/update",method=RequestMethod.POST,consumes = {"application/json"},produces={"application/json"})
     public Response<MessageDto> update(@RequestBody Request<MessageDto> request) {
     	log.info("start method /message/update");
