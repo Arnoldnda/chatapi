@@ -346,6 +346,13 @@ public class ConversationUserBusiness implements IBasicBusiness<Request<Conversa
                     return response;
                 }
 
+                // verifier si l'utisateur n'a pas déja été retirer ou n'est pas déja quitter
+                if (entityToSave.getRecreatedAt() != null ) {
+                    entityToSave.setHasDefinitivelyLeft(true);
+                    entityToSave.setDefinitivelyLeftAt(Utilities.getCurrentDate());
+                    entityToSave.setDefinitivelyLeftBy(actorId);
+                }
+
                 entityToSave.setHasLeft(true);
                 entityToSave.setLeftAt(Utilities.getCurrentDate());
                 entityToSave.setLeftBy(actorId);
