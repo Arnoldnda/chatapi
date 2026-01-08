@@ -181,13 +181,13 @@ public class FunctionalError {
 
     public Status REQUEST_ERROR(String message, Locale locale) {
         status.setCode(StatusCode.REQUEST_ERROR);
-        status.setMessage(messageSource.getMessage("StatusCode.REQUEST_ERROR", new Object[] {}, locale) + ": " + message);
+        status.setMessage(messageSource.getMessage("StatusMessage.REQUEST_ERROR", new Object[] {}, locale) + ": " + message);
         return status;
     }
 
     public Status UNAUTHORIZED(String message, Locale locale) {
         status.setCode(StatusCode.UNAUTHORIZED);
-        status.setMessage(messageSource.getMessage("StatusCode.UNAUTHORIZED", new Object[] {}, locale) + ": " + message);
+        status.setMessage(messageSource.getMessage("StatusMessage.UNAUTHORIZED", new Object[] {}, locale) + ": " + message);
         return status;
     }
 }
