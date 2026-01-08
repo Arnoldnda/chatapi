@@ -87,6 +87,39 @@ public class ConversationUserController {
         return response;
     }
 
+    @RequestMapping(value="/group/remove",method=RequestMethod.POST,consumes = {"application/json"},produces={"application/json"})
+    public Response<ConversationUserDto> removeUserToGroup(@RequestBody Request<ConversationUserDto> request) {
+        log.info("start method conversationUser/removeUserToGroup");
+        Response<ConversationUserDto> response   = new Response<ConversationUserDto>();
+        String        languageID = (String) requestBasic.getAttribute("CURRENT_LANGUAGE_IDENTIFIER");
+        Locale locale     = new Locale(languageID, "");
+        try {
+            response = Validate.validateList(request, response, functionalError, locale);
+            if (!response.isHasError()) {
+                response = conversationUserBusiness.removeUserToGroup(request, locale);
+            } else {
+                log.info(String.format("Erreur| code: {} -  message: {}", response.getStatus().getCode(), response.getStatus().getMessage()));
+                return response;
+            }
+            if (!response.isHasError()) {
+                log.info(String.format("code: {} -  message: {}", StatusCode.SUCCESS, StatusMessage.SUCCESS));
+            } else {
+                log.info(String.format("Erreur| code: {} -  message: {}", response.getStatus().getCode(), response.getStatus().getMessage()));
+            }
+        } catch (CannotCreateTransactionException e) {
+            exceptionUtils.CANNOT_CREATE_TRANSACTION_EXCEPTION(response, locale, e);
+        } catch (TransactionSystemException e) {
+            exceptionUtils.TRANSACTION_SYSTEM_EXCEPTION(response, locale, e);
+        } catch (RuntimeException e) {
+            exceptionUtils.RUNTIME_EXCEPTION(response, locale, e);
+        } catch (Exception e) {
+            exceptionUtils.EXCEPTION(response, locale, e);
+        }
+
+        log.info("end method conversationUser/removeUserToGroup");
+        return response;
+    }
+
 	@RequestMapping(value="/create",method=RequestMethod.POST,consumes = {"application/json"},produces={"application/json"})
     public Response<ConversationUserDto> create(@RequestBody Request<ConversationUserDto> request) {
     	log.info("start method /conversationUser/create");
