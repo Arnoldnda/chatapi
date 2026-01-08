@@ -52,16 +52,8 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
     private TypeConversationRepository typeConversationRepository;
     @Autowired
     private MessageRepository messageRepository;
-    @Autowired
-    private ConversationUserBusiness conversationUserBusiness;
-    @Autowired
-    private MessageBusiness messageBusiness;
 	@Autowired
 	private FunctionalError functionalError;
-	@Autowired
-	private TechnicalError technicalError;
-	@Autowired
-	private ExceptionUtils exceptionUtils;
 	@PersistenceContext
 	private EntityManager em;
 
@@ -91,19 +83,8 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 			// Definir les parametres obligatoires
 			Map<String, java.lang.Object> fieldsToVerify = new HashMap<String, java.lang.Object>();
 
-            fieldsToVerify.put("typeConversationCode", dto.getTypeConversationCode());
-
 			fieldsToVerify.put("participantIds", dto.getParticipantIds());
-
-            // pour conversation privée le message est obligatoire.
-            if (Utilities.areEquals(dto.getTypeConversationCode(), "PRIVATE")) {
-                fieldsToVerify.put("firstMessage", dto.getFirstMessage());
-            }
-
-            // pour conversation de groupe la titre de la conversation est obligatoire
-            if (Utilities.areEquals(dto.getTypeConversationCode(), "GROUP")) {
-                fieldsToVerify.put("titre", dto.getTitre());
-            }
+            fieldsToVerify.put("titre", dto.getTitre());
 
             if (!Validate.RequiredValue(fieldsToVerify).isGood()) {
 				response.setStatus(functionalError.FIELD_EMPTY(Validate.getValidate().getField(), locale));
@@ -111,19 +92,9 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 				return response;
 			}
 
-
              /*
               contrainte Générales.
             */
-
-            // Verify if typeConversationCode exist
-            TypeConversation existingTypeConversation = null;
-            existingTypeConversation = typeConversationRepository.findByCode(dto.getTypeConversationCode(), false);
-            if (existingTypeConversation == null) {
-                response.setStatus(functionalError.DATA_NOT_EXIST("Le Type de conversation invalide. Autorisé : PRIVATE, GROUP" + dto.getTypeConversationId(), locale));
-                response.setHasError(true);
-                return response;
-            }
 
             // verifier si la liste des participants n'est pas vide
             if  (dto.getParticipantIds().isEmpty()) {
@@ -151,54 +122,22 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
                 return response;
             }
 
-            // verifier que les participants existe bien
-            for (Integer userId : dto.getParticipantIds()) {
-                User user = userRepository.findOne(userId, false);
-                if (user == null) {
-                    response.setStatus(functionalError.DATA_NOT_EXIST("Ce participant n'existe pas." + userId, locale));
-                    response.setHasError(true);
-                    return response;
-                }
+            // vérifier qu'un utilisateur n'est pas ajouté deux fois ou plus
+            if (dto.getParticipantIds().size() != new HashSet<>(dto.getParticipantIds()).size()) {
+                response.setStatus(functionalError.REQUEST_ERROR(
+                        "La liste des participants contient des doublons", locale));
+                response.setHasError(true);
+                return response;
             }
 
-
-            /*
-              contrainte pour la conversation privée.
-            */
-
-            if (Utilities.areEquals(dto.getTypeConversationCode(), "PRIVATE")) {
-
-                // verifier que la liste de participant soit à 1. (en plus du créateur de la conversation.)
-                if (dto.getParticipantIds().size() != 1) {
-                    response.setStatus(functionalError.REQUEST_ERROR(
-                            "Une conversation privée doit avoir exactement un participant." + dto.getParticipantIds(),
-                            locale));
-                    response.setHasError(true);
-                    return response;
-                }
-
-                int participantId = dto.getParticipantIds().get(0);
-                int actorId = actor.getId();
-
-                // verifier si il existe deja une conversation entre les deux utilisateurs
-                List<Conversation> existingConversations = conversationRepository
-                        .findExistingPrivateConversation(actorId, participantId);
-
-                if (existingConversations != null && !existingConversations.isEmpty()) {
-                    response.setStatus(functionalError.REQUEST_ERROR(
-                            "Une conversation privée existe déjà entre ces deux utilisateurs", locale));
-                    response.setHasError(true);
-                    return response;
-                }
-
-
-                //récupérer le nom du participant pour le mettre comme titre de la conversation
-                User participant = userRepository.findOne(participantId, false);
-                dto.setTitre(participant.getNom() + " " + participant.getPrenoms());
-
+            // recupéré le type de conversation de groupe
+            TypeConversation existingTypeConversation = null;
+            existingTypeConversation = typeConversationRepository.findByCode("GROUP", false);
+            if (existingTypeConversation == null) {
+                response.setStatus(functionalError.DATA_NOT_EXIST("Le Type de conversation invalide. Autorisé : PRIVATE, GROUP" + dto.getTypeConversationId(), locale));
+                response.setHasError(true);
+                return response;
             }
-//            else if (Utilities.areEquals(dto.getTypeConversationCode(), "GROUP")) {}
-
 
             // persistance de la conversation
             Conversation entityToSave = null;
@@ -210,64 +149,54 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
             // pour pourvoir utilisé l'id générer
             Conversation entitySaved = conversationRepository.save(entityToSave);
 
-            log.info("----begin Ajout member in conversation -----");
+            log.info("----begin Ajout member in conversation (manual) -----");
 
-            Request<ConversationUserDto> conversationUserDtoRequest = new Request<ConversationUserDto>();
-            conversationUserDtoRequest.setUser(actor.getId());
+            List<ConversationUser> participants = new ArrayList<>();
 
-            List<ConversationUserDto> liste = new ArrayList<ConversationUserDto>();
+            //  Ajout du créateur de la conversation
+            ConversationUser creator = new ConversationUser();
+            creator.setConversation(entitySaved);
+            creator.setUser(actor);
+            // rôle : admin
+            creator.setRole(true);
+            creator.setHasLeft(false);
+            creator.setHasDefinitivelyLeft(false);
+            creator.setHasCleaned(false);
+            creator.setIsDeleted(false);
+            creator.setCreatedAt(Utilities.getCurrentDate());
+            creator.setCreatedBy(actor.getId());
 
-            // ajouter le créateur de la conversation dans la conversation
-            ConversationUserDto creatorDto = new ConversationUserDto();
-            creatorDto.setConversationId(entitySaved.getId());
-            creatorDto.setUserId(actor.getId());
-            creatorDto.setRole(true); // en tant qu'administrateur
-            liste.add(creatorDto);
+            participants.add(creator);
 
-            // ajouter des participants de la conversation dans la conversation
+            // Ajout des participants
             for (Integer participantId : dto.getParticipantIds()) {
-                ConversationUserDto participantDto = new ConversationUserDto();
-                participantDto.setConversationId(entitySaved.getId());
-                participantDto.setUserId(participantId);
-                participantDto.setRole(false); // en tant qu'administrateur
-                liste.add(participantDto);
-            }
-            conversationUserDtoRequest.setDatas(liste);
 
-            // le business d'ajout de membre se charge de la requête.
-            Response<ConversationUserDto> conversationUserDtoResponse = conversationUserBusiness.create(
-                    conversationUserDtoRequest, locale);
-            if (conversationUserDtoResponse.isHasError()) {
-                return response;
-            }
-
-            log.info("----end Ajout member in conversation -----");
-
-
-            if (dto.getFirstMessage() != null ) {
-                log.info("----Begin Ajout first message -----");
-
-                Request<MessageDto> messageDtoRequest = new Request<MessageDto>();
-                messageDtoRequest.setUser(actor.getId());
-
-                List<MessageDto> messageDtoList = new ArrayList<MessageDto>();
-
-                dto.getFirstMessage().setConversationId(entitySaved.getId());
-
-                messageDtoList.add(dto.getFirstMessage());
-
-                messageDtoRequest.setDatas(messageDtoList);
-
-                // le business de création de message se charge de la requête
-                Response<MessageDto> messageDtoResponse =  messageBusiness.create(messageDtoRequest, locale);
-
-                if (messageDtoResponse.isHasError()) {
+                User participant = userRepository.findOne(participantId, false);
+                if (participant == null) {
+                    response.setStatus(functionalError.DATA_NOT_EXIST("Ce participant n'existe pas." + participantId, locale));
+                    response.setHasError(true);
                     return response;
                 }
 
-                log.info("----end Ajout first message -----");
+                ConversationUser participant1 = new ConversationUser();
+                participant1.setConversation(entitySaved);
+                participant1.setUser(participant);
+                participant1.setRole(false); // simple membre
 
+                participant1.setHasLeft(false);
+                participant1.setHasDefinitivelyLeft(false);
+                participant1.setHasCleaned(false);
+                participant1.setIsDeleted(false);
+
+                participant1.setCreatedAt(Utilities.getCurrentDate());
+                participant1.setCreatedBy(actor.getId());
+
+                participants.add(participant1);
             }
+
+            conversationUserRepository.saveAll(participants);
+
+            log.info("----end Ajout member in conversation (manual) -----");
 
             items.add(entitySaved);
 		}
