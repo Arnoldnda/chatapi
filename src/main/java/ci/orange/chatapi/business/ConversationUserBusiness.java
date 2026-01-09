@@ -559,7 +559,143 @@ public class ConversationUserBusiness implements IBasicBusiness<Request<Conversa
                 response.setHasError(false);
             }
 
-            log.info("----begin update ConversationUser-----");
+            log.info("----end leaveGroup-----");
+            return response;
+
+        } catch (PermissionDeniedDataAccessException e) {
+            exceptionUtils.PERMISSION_DENIED_DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (DataAccessResourceFailureException e) {
+            exceptionUtils.DATA_ACCESS_RESOURCE_FAILURE_EXCEPTION(response, locale, e);
+        } catch (DataAccessException e) {
+            exceptionUtils.DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (RuntimeException e) {
+            exceptionUtils.RUNTIME_EXCEPTION(response, locale, e);
+        } catch (Exception e) {
+            exceptionUtils.EXCEPTION(response, locale, e);
+        } finally {
+            if (response.isHasError() && response.getStatus() != null) {
+                log.info(String.format("Erreur| code: {} -  message: {}", response.getStatus().getCode(), response.getStatus().getMessage()));
+                throw new RuntimeException(response.getStatus().getCode() + ";" + response.getStatus().getMessage());
+            }
+        }
+
+        return response;
+    }
+
+    /**
+     * delete conversation locally by using ConversationUserDto as object.
+     *
+     * @param request
+     * @return response
+     *
+     */
+    @Transactional(rollbackFor = {RuntimeException.class, Exception.class})
+    public Response<ConversationUserDto> deleteConversationLocally(Request<ConversationUserDto> request, Locale locale)  throws ParseException {
+        Response<ConversationUserDto> response = new Response<ConversationUserDto>();
+        try {
+            log.info("----begin deleteConversationLocally-----");
+
+            List<ConversationUser>        items    = new ArrayList<ConversationUser>();
+
+            for (ConversationUserDto dto : request.getDatas()) {
+                // Definir les parametres obligatoires
+                Map<String, java.lang.Object> fieldsToVerify = new HashMap<String, java.lang.Object>();
+                fieldsToVerify.put("conversationId", dto.getConversationId());
+
+                if (!Validate.RequiredValue(fieldsToVerify).isGood()) {
+                    response.setStatus(functionalError.FIELD_EMPTY(Validate.getValidate().getField(), locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                Integer actorId = request.getUser();
+
+                // verifier si l'acteur existe
+                User actor = userRepository.findOne(actorId, false);
+                if (actor == null) {
+                    response.setStatus(functionalError.DATA_NOT_EXIST("Utilisateur inexistant : " + actorId, locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // Verify if conversation exist
+                Conversation existingConversation = conversationRepository.findOne(dto.getConversationId(), false);
+                if (existingConversation == null) {
+                    response.setStatus(functionalError.DATA_NOT_EXIST("Conversation inexistante ou supprimée" + dto.getConversationId(), locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // Récupérer le membership de l'acteur
+                ConversationUser actorMembership = conversationUserRepository.findByConversation_IdAndUser_IdAndIsDeletedFalse(
+                        existingConversation.getId(), actorId);
+                if (actorMembership == null) {
+                    response.setStatus( functionalError.UNAUTHORIZED(
+                            "Vous n'êtes pas membre de cette conversation", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // vérifier s'il a déja suprimé la conversation localement
+                if (Utilities.isTrue(actorMembership.getHasCleaned())) {
+                    response.setStatus(functionalError.REQUEST_ERROR(
+                            "Vous avez déjà supprimé cette conversation", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // Règle métier selon le type de conversation
+                if (Utilities.areEquals(existingConversation.getTypeConversation().getCode(), "GROUP")) {
+
+                    // Pour GROUP : doit avoir quitté avant de supprimer
+                    if (!Utilities.isTrue(actorMembership.getHasLeft())) {
+                        response.setStatus(functionalError.REQUEST_ERROR(
+                                "Vous devez quitter le groupe avant de le supprimer", locale));
+                        response.setHasError(true);
+                        return response;
+                    }
+
+                }
+
+                // Marquer comme supprimé localement
+                actorMembership.setHasCleaned(true);
+                actorMembership.setUpdatedAt(Utilities.getCurrentDate());
+                actorMembership.setUpdatedBy(actorId);
+                items.add(actorMembership);
+
+                log.info("Conversation " + existingConversation.getId() + " supprimée localement par l'utilisateur " + actorId);
+            }
+
+            if (!items.isEmpty()) {
+                List<ConversationUser> itemsSaved = null;
+                // maj les donnees en base
+                itemsSaved = conversationUserRepository.saveAll((Iterable<ConversationUser>) items);
+                if (itemsSaved == null) {
+                    response.setStatus(functionalError.SAVE_FAIL("conversationUser", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+                List<ConversationUserDto> itemsDto = (Utilities.isTrue(request.getIsSimpleLoading())) ? ConversationUserTransformer.INSTANCE.toLiteDtos(itemsSaved) : ConversationUserTransformer.INSTANCE.toDtos(itemsSaved);
+
+                final int size = itemsSaved.size();
+                List<String>  listOfError      = Collections.synchronizedList(new ArrayList<String>());
+                itemsDto.parallelStream().forEach(dto -> {
+                    try {
+                        dto = getFullInfos(dto, size, request.getIsSimpleLoading(), locale);
+                    } catch (Exception e) {
+                        listOfError.add(e.getMessage());
+                        e.printStackTrace();
+                    }
+                });
+                if (Utilities.isNotEmpty(listOfError)) {
+                    Object[] objArray = listOfError.stream().distinct().toArray();
+                    throw new RuntimeException(StringUtils.join(objArray, ", "));
+                }
+                response.setItems(itemsDto);
+                response.setHasError(false);
+            }
+
+            log.info("----end deleteConversationLocally-----");
             return response;
 
         } catch (PermissionDeniedDataAccessException e) {
