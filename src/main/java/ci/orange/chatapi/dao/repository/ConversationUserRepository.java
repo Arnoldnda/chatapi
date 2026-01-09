@@ -10,6 +10,8 @@ import org.springframework.stereotype.Repository;
 import ci.orange.chatapi.dao.entity.*;
 import ci.orange.chatapi.dao.repository.base._ConversationUserRepository;
 
+import java.util.List;
+
 /**
  * Repository : ConversationUser.
  *
@@ -31,4 +33,27 @@ public interface ConversationUserRepository extends JpaRepository<ConversationUs
 
     ConversationUser findByConversation_IdAndUser_IdAndIsDeletedFalse(Integer conversationId, Integer userId);
 
+    @Query("SELECT COUNT(cu) FROM ConversationUser cu WHERE " +
+            "cu.conversation.id = :conversationId AND " +
+            "cu.role = true AND " +
+            "(cu.isDeleted = false OR cu.isDeleted IS NULL) AND " +
+            "(cu.hasLeft = false OR cu.hasLeft IS NULL) AND " +
+            "(cu.hasDefinitivelyLeft = false OR cu.hasDefinitivelyLeft IS NULL)")
+    long countActiveAdmins(@Param("conversationId") int conversationId);
+
+    @Query("""
+    SELECT cu
+    FROM ConversationUser cu
+    WHERE cu.conversation.id = :conversationId
+      AND cu.role = false
+      AND cu.user.id <> :excludeUserId
+      AND (cu.isDeleted = false OR cu.isDeleted IS NULL)
+      AND (cu.hasLeft = false OR cu.hasLeft IS NULL)
+      AND (cu.hasDefinitivelyLeft = false OR cu.hasDefinitivelyLeft IS NULL)
+    ORDER BY cu.createdAt ASC
+    """)
+    List<ConversationUser> findEligibleMemberForAdminTransfer(
+            @Param("conversationId") int conversationId,
+            @Param("excludeUserId") int excludeUserId
+    );
 }

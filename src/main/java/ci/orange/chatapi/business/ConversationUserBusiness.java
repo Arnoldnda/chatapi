@@ -351,14 +351,183 @@ public class ConversationUserBusiness implements IBasicBusiness<Request<Conversa
                     entityToSave.setHasDefinitivelyLeft(true);
                     entityToSave.setDefinitivelyLeftAt(Utilities.getCurrentDate());
                     entityToSave.setDefinitivelyLeftBy(actorId);
+                } else {
+                    entityToSave.setLeftAt(Utilities.getCurrentDate());
+                    entityToSave.setLeftBy(actorId);
                 }
 
                 entityToSave.setHasLeft(true);
-                entityToSave.setLeftAt(Utilities.getCurrentDate());
-                entityToSave.setLeftBy(actorId);
                 entityToSave.setUpdatedAt(Utilities.getCurrentDate());
                 entityToSave.setUpdatedBy(actorId);
                 items.add(entityToSave);
+            }
+
+            if (!items.isEmpty()) {
+                List<ConversationUser> itemsSaved = null;
+                // maj les donnees en base
+                itemsSaved = conversationUserRepository.saveAll((Iterable<ConversationUser>) items);
+                if (itemsSaved == null) {
+                    response.setStatus(functionalError.SAVE_FAIL("conversationUser", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+                List<ConversationUserDto> itemsDto = (Utilities.isTrue(request.getIsSimpleLoading())) ? ConversationUserTransformer.INSTANCE.toLiteDtos(itemsSaved) : ConversationUserTransformer.INSTANCE.toDtos(itemsSaved);
+
+                final int size = itemsSaved.size();
+                List<String>  listOfError      = Collections.synchronizedList(new ArrayList<String>());
+                itemsDto.parallelStream().forEach(dto -> {
+                    try {
+                        dto = getFullInfos(dto, size, request.getIsSimpleLoading(), locale);
+                    } catch (Exception e) {
+                        listOfError.add(e.getMessage());
+                        e.printStackTrace();
+                    }
+                });
+                if (Utilities.isNotEmpty(listOfError)) {
+                    Object[] objArray = listOfError.stream().distinct().toArray();
+                    throw new RuntimeException(StringUtils.join(objArray, ", "));
+                }
+                response.setItems(itemsDto);
+                response.setHasError(false);
+            }
+
+            log.info("----begin update ConversationUser-----");
+            return response;
+
+        } catch (PermissionDeniedDataAccessException e) {
+            exceptionUtils.PERMISSION_DENIED_DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (DataAccessResourceFailureException e) {
+            exceptionUtils.DATA_ACCESS_RESOURCE_FAILURE_EXCEPTION(response, locale, e);
+        } catch (DataAccessException e) {
+            exceptionUtils.DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (RuntimeException e) {
+            exceptionUtils.RUNTIME_EXCEPTION(response, locale, e);
+        } catch (Exception e) {
+            exceptionUtils.EXCEPTION(response, locale, e);
+        } finally {
+            if (response.isHasError() && response.getStatus() != null) {
+                log.info(String.format("Erreur| code: {} -  message: {}", response.getStatus().getCode(), response.getStatus().getMessage()));
+                throw new RuntimeException(response.getStatus().getCode() + ";" + response.getStatus().getMessage());
+            }
+        }
+
+        return response;
+    }
+
+    /**
+     * user leave in conversation by using ConversationUserDto as object.
+     *
+     * @param request
+     * @return response
+     *
+     */
+    @Transactional(rollbackFor = {RuntimeException.class, Exception.class})
+    public Response<ConversationUserDto> leaveGroup(Request<ConversationUserDto> request, Locale locale)  throws ParseException {
+        Response<ConversationUserDto> response = new Response<ConversationUserDto>();
+        try {
+            log.info("----begin leaveGroup-----");
+
+            List<ConversationUser>        items    = new ArrayList<ConversationUser>();
+
+            for (ConversationUserDto dto : request.getDatas()) {
+                // Definir les parametres obligatoires
+                Map<String, java.lang.Object> fieldsToVerify = new HashMap<String, java.lang.Object>();
+                fieldsToVerify.put("conversationId", dto.getConversationId());
+
+                if (!Validate.RequiredValue(fieldsToVerify).isGood()) {
+                    response.setStatus(functionalError.FIELD_EMPTY(Validate.getValidate().getField(), locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                Integer actorId = request.getUser();
+
+                // verifier si l'acteur existe
+                User actor = userRepository.findOne(actorId, false);
+                if (actor == null) {
+                    response.setStatus(functionalError.DATA_NOT_EXIST("Utilisateur inexistant : " + actorId, locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // Verify if conversation exist
+                Conversation existingConversation = conversationRepository.findOne(dto.getConversationId(), false);
+                if (existingConversation == null) {
+                    response.setStatus(functionalError.DATA_NOT_EXIST("Conversation inexistante ou supprimée" + dto.getConversationId(), locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // vérifié que c'est bien un groupe
+                if (!Utilities.areEquals(existingConversation.getTypeConversation().getCode(), "GROUP")) {
+                    response.setStatus(functionalError.REQUEST_ERROR(
+                            "Retrait de membre autorisé uniquement pour les groupes", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                // vérifier si l'acteur est un membre actif de la conversation
+                ConversationUser actorMembership = conversationUserRepository.findActiveUserInConversation(
+                        existingConversation.getId(), actorId);
+                if (actorMembership == null) {
+                    response.setStatus( functionalError.UNAUTHORIZED(
+                            "Vous n'êtes pas membre actif de ce groupe", locale));
+                    response.setHasError(true);
+                    return response;
+                }
+
+                //vérifié que l'actor est admin (Trasfert de l'aministration si dernier admin)
+                if (Utilities.isTrue(actorMembership.getRole())) {
+
+                    // récupére le nombre d'admins actif dans le groupe
+                    long adminCount = conversationUserRepository.countActiveAdmins(existingConversation.getId());
+
+                    if (adminCount == 1 ) {
+                        //recupérer les autres membres actifs de la conversation hors mi l'acteur
+                        List<ConversationUser> eligibleMembers =
+                                conversationUserRepository.findEligibleMemberForAdminTransfer(existingConversation.getId(), actorId);
+
+                        // verifier si il y'a pas de membre eligible (à traité plus tard)
+                        if (eligibleMembers.isEmpty()) {
+                            response.setStatus(functionalError.REQUEST_ERROR(
+                                    "Impossible de quitter : aucun membre disponible pour devenir administrateur",
+                                    locale));
+                            response.setHasError(true);
+                            return response;
+                        }
+
+                        // retirer l'admin à celui qui quitte le groupe
+                        actorMembership.setRole(false);
+
+                        // mettre,le role admin au nouveau
+                        ConversationUser newAdmin = eligibleMembers.get(0);
+                        newAdmin.setRole(true);
+                        newAdmin.setUpdatedAt(Utilities.getCurrentDate());
+                        newAdmin.setUpdatedBy(actorId);
+
+                        conversationUserRepository.save(newAdmin);
+
+
+                        log.info("Administration transférer à UserId : " + newAdmin.getUser().getId());
+                    }
+                }
+
+                // verifier si l'utisateur n'a pas déja été retirer ou n'est pas déja quitter
+                if (actorMembership.getRecreatedAt() != null ) {
+                    actorMembership.setHasDefinitivelyLeft(true);
+                    actorMembership.setDefinitivelyLeftAt(Utilities.getCurrentDate());
+                    actorMembership.setDefinitivelyLeftBy(actorId);
+                } else {
+                    actorMembership.setLeftAt(Utilities.getCurrentDate());
+                    actorMembership.setLeftBy(actorId);
+                }
+
+                actorMembership.setHasLeft(true);
+                actorMembership.setUpdatedAt(Utilities.getCurrentDate());
+                actorMembership.setUpdatedBy(actorId);
+                items.add(actorMembership);
+
+                log.info("Utilisateur à quitté la conversation actorId : " + actorId + "conversationId : " + existingConversation.getId());
             }
 
             if (!items.isEmpty()) {
