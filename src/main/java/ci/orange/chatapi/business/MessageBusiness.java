@@ -240,6 +240,23 @@ public class MessageBusiness implements IBasicBusiness<Request<MessageDto>, Resp
                         existingConversation = existingPrivateConversation.get() ;
                 }
 
+                // activé la conversation des participants au cas où elle était suprimé
+                List<ConversationUser> allParticipant = conversationUserRepository.findByConversationId(existingConversation.getId(), false);
+                boolean hasReactivated = false;
+                for (ConversationUser participant : allParticipant) {
+                    if (Utilities.isTrue(participant.getHasCleaned())) {
+                        participant.setHasCleaned(false);
+                        participant.setUpdatedAt(Utilities.getCurrentDate());
+                        participant.setUpdatedBy(actorId);
+                        hasReactivated = true;
+                    }
+                }
+
+                if (hasReactivated) {
+                    conversationUserRepository.saveAll(allParticipant);
+                    log.info("Conversation " + existingConversation.getId() + " réactivée pour les participants");
+                }
+
                 // assigné l'id de la conversation dans le message
                 dto.setConversationId(existingConversation.getId());
 
