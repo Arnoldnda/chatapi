@@ -21,8 +21,6 @@ import java.util.*;
 
 import ci.orange.chatapi.utils.*;
 import ci.orange.chatapi.utils.dto.*;
-import ci.orange.chatapi.utils.enums.*;
-import ci.orange.chatapi.utils.contract.*;
 import ci.orange.chatapi.utils.contract.IBasicBusiness;
 import ci.orange.chatapi.utils.contract.Request;
 import ci.orange.chatapi.utils.contract.Response;
@@ -32,6 +30,7 @@ import ci.orange.chatapi.dao.entity.User;
 import ci.orange.chatapi.dao.entity.Message;
 import ci.orange.chatapi.dao.entity.*;
 import ci.orange.chatapi.dao.repository.*;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
 BUSINESS for table "historique_suppression_message"
@@ -46,6 +45,8 @@ public class HistoriqueSuppressionMessageBusiness implements IBasicBusiness<Requ
 	private Response<HistoriqueSuppressionMessageDto> response;
 	@Autowired
 	private HistoriqueSuppressionMessageRepository historiqueSuppressionMessageRepository;
+    @Autowired
+    private ConversationUserRepository conversationUserRepository;
 	@Autowired
 	private UserRepository userRepository;
 	@Autowired
@@ -66,7 +67,125 @@ public class HistoriqueSuppressionMessageBusiness implements IBasicBusiness<Requ
 		dateFormat = new SimpleDateFormat("dd/MM/yyyy");
 		dateTimeFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 	}
-	
+
+    /**
+     * delete message by using HistoriqueSuppressionMessageDto as object.
+     *
+     * @param request
+     * @return response
+     *
+     */
+    @Transactional(rollbackFor = {RuntimeException.class, Exception.class})
+    public Response<HistoriqueSuppressionMessageDto> deleteMessageLocally(Request<HistoriqueSuppressionMessageDto> request, Locale locale)  throws ParseException {
+        log.info("----begin create HistoriqueSuppressionMessage-----");
+
+        Response<HistoriqueSuppressionMessageDto> response = new Response<HistoriqueSuppressionMessageDto>();
+        List<HistoriqueSuppressionMessage>        items    = new ArrayList<HistoriqueSuppressionMessage>();
+
+        for (HistoriqueSuppressionMessageDto dto : request.getDatas()) {
+            // Definir les parametres obligatoires
+            Map<String, java.lang.Object> fieldsToVerify = new HashMap<String, java.lang.Object>();
+            fieldsToVerify.put("messageId", dto.getMessageId());
+
+            if (!Validate.RequiredValue(fieldsToVerify).isGood()) {
+                response.setStatus(functionalError.FIELD_EMPTY(Validate.getValidate().getField(), locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            Integer actorId = request.getUser();
+
+            // Verify if user exist
+            User actor = null;
+            actor = userRepository.findOne(actorId, false);
+            if (actor == null) {
+                response.setStatus(functionalError.DATA_NOT_EXIST("Utilisateur inexistant: " + actorId, locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            // Verify if message exist
+            Message existingMessage = null;
+            existingMessage = messageRepository.findOne(dto.getMessageId(), false);
+            if (existingMessage == null) {
+                response.setStatus(functionalError.DATA_NOT_EXIST("Message inexistant: " + dto.getMessageId(), locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            // récupérer la conversation du message
+            Conversation conversation = existingMessage.getConversation();
+            if (conversation == null) {
+                response.setStatus(functionalError.DATA_NOT_EXIST(
+                        "Conversation du message inexistante", locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            // vérifier que l'utilisateur est membre de la conversation
+            ConversationUser membership = conversationUserRepository.findActiveUserInConversation(
+                    conversation.getId(), actorId
+            );
+            if(membership == null ) {
+                response.setStatus(functionalError.UNAUTHORIZED(
+                        "Vous n'êtes pas membre de cette conversation", locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            // vérifié si le message n'as pas déjé été suprimé
+           Optional<HistoriqueSuppressionMessage> historiqueSuppressionMessage = historiqueSuppressionMessageRepository
+                    .findByMessage_IdAndUser_IdAndIsDeletedFalse(dto.getMessageId(), actorId);
+            if (historiqueSuppressionMessage.isPresent()) {
+                response.setStatus(functionalError.REQUEST_ERROR(
+                        "Vous avez déjà supprimé ce message", locale));
+                response.setHasError(true);
+                return response;
+            }
+
+
+            HistoriqueSuppressionMessage entityToSave = null;
+            entityToSave = HistoriqueSuppressionMessageTransformer.INSTANCE.toEntity(dto, actor, existingMessage);
+            entityToSave.setIsHidden(true);
+            entityToSave.setCreatedAt(Utilities.getCurrentDate());
+            entityToSave.setCreatedBy(actorId);
+            entityToSave.setIsDeleted(false);
+            items.add(entityToSave);
+        }
+
+        if (!items.isEmpty()) {
+            List<HistoriqueSuppressionMessage> itemsSaved = null;
+            // inserer les donnees en base de donnees
+            itemsSaved = historiqueSuppressionMessageRepository.saveAll((Iterable<HistoriqueSuppressionMessage>) items);
+            if (itemsSaved == null) {
+                response.setStatus(functionalError.SAVE_FAIL("historiqueSuppressionMessage", locale));
+                response.setHasError(true);
+                return response;
+            }
+            List<HistoriqueSuppressionMessageDto> itemsDto = (Utilities.isTrue(request.getIsSimpleLoading())) ? HistoriqueSuppressionMessageTransformer.INSTANCE.toLiteDtos(itemsSaved) : HistoriqueSuppressionMessageTransformer.INSTANCE.toDtos(itemsSaved);
+
+            final int size = itemsSaved.size();
+            List<String>  listOfError      = Collections.synchronizedList(new ArrayList<String>());
+            itemsDto.parallelStream().forEach(dto -> {
+                try {
+                    dto = getFullInfos(dto, size, request.getIsSimpleLoading(), locale);
+                } catch (Exception e) {
+                    listOfError.add(e.getMessage());
+                    e.printStackTrace();
+                }
+            });
+            if (Utilities.isNotEmpty(listOfError)) {
+                Object[] objArray = listOfError.stream().distinct().toArray();
+                throw new RuntimeException(StringUtils.join(objArray, ", "));
+            }
+            response.setItems(itemsDto);
+            response.setHasError(false);
+        }
+
+        log.info("----end create HistoriqueSuppressionMessage-----");
+        return response;
+    }
+
 	/**
 	 * create HistoriqueSuppressionMessage by using HistoriqueSuppressionMessageDto as object.
 	 * 

@@ -2,14 +2,10 @@
 
 package ci.orange.chatapi.dao.repository;
 
-import java.util.Date;
+import java.util.*;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.HashMap;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Locale;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
 
@@ -35,5 +31,9 @@ import ci.orange.chatapi.dao.repository.base._HistoriqueSuppressionMessageReposi
  */
 @Repository
 public interface HistoriqueSuppressionMessageRepository extends JpaRepository<HistoriqueSuppressionMessage, Integer>, _HistoriqueSuppressionMessageRepository {
+    Optional<HistoriqueSuppressionMessage> findByMessage_IdAndUser_IdAndIsDeletedFalse(
+            @Param("messageId") Integer messageId,
+            @Param("userId") Integer userId
+    );
 
 }
