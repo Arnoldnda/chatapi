@@ -11,6 +11,9 @@ package ci.orange.chatapi.business;
 import lombok.extern.java.Log;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.PermissionDeniedDataAccessException;
 import org.springframework.stereotype.Component;
 
 import jakarta.persistence.EntityManager;
@@ -21,8 +24,6 @@ import java.util.*;
 
 import ci.orange.chatapi.utils.*;
 import ci.orange.chatapi.utils.dto.*;
-import ci.orange.chatapi.utils.enums.*;
-import ci.orange.chatapi.utils.contract.*;
 import ci.orange.chatapi.utils.contract.IBasicBusiness;
 import ci.orange.chatapi.utils.contract.Request;
 import ci.orange.chatapi.utils.contract.Response;
@@ -30,6 +31,7 @@ import ci.orange.chatapi.utils.dto.transformer.*;
 import ci.orange.chatapi.dao.entity.User;
 import ci.orange.chatapi.dao.entity.*;
 import ci.orange.chatapi.dao.repository.*;
+import org.springframework.transaction.annotation.Transactional;
 
 /**
 BUSINESS for table "user"
@@ -64,6 +66,82 @@ public class UserBusiness implements IBasicBusiness<Request<UserDto>, Response<U
 		dateFormat = new SimpleDateFormat("dd/MM/yyyy");
 		dateTimeFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 	}
+
+    /**
+     * login User by using UserDto as object.
+     *
+     * @param request
+     * @return response
+     *
+     */
+    @Transactional(rollbackFor = {RuntimeException.class, Exception.class})
+    public Response<UserDto> login(Request<UserDto> request, Locale locale)  throws ParseException {
+        Response<UserDto> response = new Response<UserDto>();
+        try {
+            log.info("----begin login User-----");
+
+            // Une seule tentative de connexion à la fois
+            if (request.getDatas().size() != 1) {
+                response.setStatus(functionalError.REQUEST_ERROR(
+                        "Une seule tentative de connexion autorisée", locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            UserDto dto = request.getDatas().get(0);
+
+            // Definir les parametres obligatoires
+            Map<String, java.lang.Object> fieldsToVerify = new HashMap<String, java.lang.Object>();
+            fieldsToVerify.put("login", dto.getLogin());
+
+            if (!Validate.RequiredValue(fieldsToVerify).isGood()) {
+                response.setStatus(functionalError.FIELD_EMPTY(Validate.getValidate().getField(), locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            String login = dto.getLogin().trim();
+
+            User existingEntity = null;
+            // verif unique login in db
+            existingEntity = userRepository.findByLogin(login, false);
+            if (existingEntity == null) {
+                response.setStatus(functionalError.DATA_EXIST("Login introuvable! Login : " + dto.getLogin(), locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            log.info("Connexion réussie pour l'utilisateur. Login : " + login + "ID : " + existingEntity.getId());
+
+            UserDto userDto = (Utilities.isTrue(request.getIsSimpleLoading())) ? UserTransformer.INSTANCE.toLiteDto(existingEntity) : UserTransformer.INSTANCE.toDto(existingEntity);
+
+            dto = getFullInfos(userDto, 1, request.getIsSimpleLoading(), locale);
+
+            response.setItems(( Arrays.asList(userDto)));
+            response.setHasError(false);
+
+
+            log.info("----end login User-----");
+            return response;
+
+        } catch (PermissionDeniedDataAccessException e) {
+            exceptionUtils.PERMISSION_DENIED_DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (DataAccessResourceFailureException e) {
+            exceptionUtils.DATA_ACCESS_RESOURCE_FAILURE_EXCEPTION(response, locale, e);
+        } catch (DataAccessException e) {
+            exceptionUtils.DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (RuntimeException e) {
+            exceptionUtils.RUNTIME_EXCEPTION(response, locale, e);
+        } catch (Exception e) {
+            exceptionUtils.EXCEPTION(response, locale, e);
+        } finally {
+            if (response.isHasError() && response.getStatus() != null) {
+                log.info(String.format("Erreur| code: {} -  message: {}", response.getStatus().getCode(), response.getStatus().getMessage()));
+                throw new RuntimeException(response.getStatus().getCode() + ";" + response.getStatus().getMessage());
+            }
+        }
+        return response;
+    }
 	
 	/**
 	 * create User by using UserDto as object.
