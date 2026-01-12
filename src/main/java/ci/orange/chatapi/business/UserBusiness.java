@@ -85,32 +85,50 @@ public class UserBusiness implements IBasicBusiness<Request<UserDto>, Response<U
 			fieldsToVerify.put("nom", dto.getNom());
 			fieldsToVerify.put("prenoms", dto.getPrenoms());
 			fieldsToVerify.put("login", dto.getLogin());
-			fieldsToVerify.put("deletedAt", dto.getDeletedAt());
-			fieldsToVerify.put("deletedBy", dto.getDeletedBy());
+
 			if (!Validate.RequiredValue(fieldsToVerify).isGood()) {
 				response.setStatus(functionalError.FIELD_EMPTY(Validate.getValidate().getField(), locale));
 				response.setHasError(true);
 				return response;
 			}
 
-			// Verify if user to insert do not exist
+            // Validation du login
+            String login = dto.getLogin().trim();
+
+            // Vérifier la longueur minimale
+            if (login.length() < 3) {
+                response.setStatus(functionalError.REQUEST_ERROR(
+                        "Le login doit contenir au moins 3 caractères", locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            // Vérifier le format (lettres, chiffres, tirets, underscores uniquement)
+            if (!login.matches("^[A-Za-z0-9_-]+$")) {
+                response.setStatus(functionalError.REQUEST_ERROR(
+                        "Le login ne peut contenir que des lettres, chiffres, tirets et underscores",
+                        locale));
+                response.setHasError(true);
+                return response;
+            }
+
 			User existingEntity = null;
-
-/*
-			if (existingEntity != null) {
-				response.setStatus(functionalError.DATA_EXIST("user id -> " + dto.getId(), locale));
-				response.setHasError(true);
-				return response;
-			}
-
-*/
 			// verif unique login in db
 			existingEntity = userRepository.findByLogin(dto.getLogin(), false);
 			if (existingEntity != null) {
-				response.setStatus(functionalError.DATA_EXIST("user login -> " + dto.getLogin(), locale));
+				response.setStatus(functionalError.DATA_EXIST("Ce login est déjà utilisé." + dto.getLogin(), locale));
 				response.setHasError(true);
 				return response;
 			}
+
+            // Validation du nom et prenoms
+            if (dto.getNom().trim().isEmpty() || dto.getPrenoms().trim().isEmpty()) {
+                response.setStatus(functionalError.FIELD_EMPTY(
+                        "Le nom et les prénoms ne peuvent pas être vides", locale));
+                response.setHasError(true);
+                return response;
+            }
+
 			// verif unique login in items to save
 			if (items.stream().anyMatch(a -> a.getLogin().equalsIgnoreCase(dto.getLogin()))) {
 				response.setStatus(functionalError.DATA_DUPLICATE(" login ", locale));
@@ -118,8 +136,11 @@ public class UserBusiness implements IBasicBusiness<Request<UserDto>, Response<U
 				return response;
 			}
 
-				User entityToSave = null;
+            User entityToSave = null;
 			entityToSave = UserTransformer.INSTANCE.toEntity(dto);
+            entityToSave.setNom(dto.getNom().trim());
+            entityToSave.setPrenoms(dto.getPrenoms().trim());
+            entityToSave.setLogin(login);
 			entityToSave.setCreatedAt(Utilities.getCurrentDate());
 			entityToSave.setCreatedBy(request.getUser());
 			entityToSave.setIsDeleted(false);
