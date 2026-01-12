@@ -123,7 +123,7 @@ public class HistoriqueSuppressionMessageBusiness implements IBasicBusiness<Requ
             }
 
             // vérifier que l'utilisateur est membre de la conversation
-            ConversationUser membership = conversationUserRepository.findActiveUserInConversation(
+            ConversationUser membership = conversationUserRepository.findByConversation_IdAndUser_IdAndIsDeletedFalse(
                     conversation.getId(), actorId
             );
             if(membership == null ) {
