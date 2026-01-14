@@ -25,11 +25,14 @@ import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import ci.orange.chatapi.utils.*;
 import ci.orange.chatapi.utils.dto.*;
@@ -123,7 +126,7 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 
             // Vérifier que l'utilisateur est membre
             ConversationUser membershipOpt = conversationUserRepository
-                    .findByConversation_IdAndUser_IdAndIsDeletedFalse(conversationId, userId);
+                    .findActiveUserInConversation(conversationId, userId);
 
             if (membershipOpt == null ) {
                 response.setStatus(functionalError.UNAUTHORIZED(
@@ -340,6 +343,307 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
         } catch (Exception e) {
             exceptionUtils.EXCEPTION(response, locale, e);
         } finally {
+            if (response.isHasError() && response.getStatus() != null) {
+                log.info(String.format("Erreur| code: {} - message: {}",
+                        response.getStatus().getCode(), response.getStatus().getMessage()));
+                throw new RuntimeException(response.getStatus().getCode() + ";" +
+                        response.getStatus().getMessage());
+            }
+        }
+        return response;
+    }
+
+    public Response<ConversationDto> exportAllConversations(Request<ConversationDto> request, Locale locale) {
+        SimpleDateFormat sdfFileName = new SimpleDateFormat("yyyyMMdd_HHmmss");
+        SimpleDateFormat sdfDate = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+        Response<ConversationDto> response = new Response<ConversationDto>();
+        List<String> generatedFiles = new ArrayList<>();
+
+        try {
+            log.info("----begin exportAllConversations-----");
+
+            Integer userId = request.getUser();
+
+            // Récupérer toutes les conversations active de l'utilisateur
+            List<ConversationUser> userConversations = conversationUserRepository
+                    .findActiveConversationsByUser(userId);
+
+            if (Utilities.isEmpty(userConversations)) {
+                response.setStatus(functionalError.DATA_EMPTY(
+                        "Aucune conversation à exporter", locale));
+                response.setHasError(false);
+                return response;
+            }
+
+            log.info("Exporting " + userConversations.size() + " conversations for user " + userId);
+
+            // Charger le template
+            ClassPathResource resource = new ClassPathResource(
+                    "templates/excel/conversation_export_template.xlsx");
+
+            // Pour chaque conversation, générer un fichier Excel
+            int fileCount = 1;
+            for (ConversationUser userConv : userConversations) {
+                Conversation conversation = userConv.getConversation();
+
+                // Skip si conversation supprimée
+                if (Utilities.isTrue(conversation.getIsDeleted())) {
+                    continue;
+                }
+
+                try {
+                    InputStream inputStream = resource.getInputStream();
+                    XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
+                    XSSFSheet sheet = workbook.getSheetAt(0);
+
+                    Cell cell = null;
+                    Row row = null;
+                    int rowIndex = 0;
+
+                    // === INFORMATIONS CONVERSATION ===
+                    row = sheet.getRow(rowIndex++);
+                    if (row == null) row = sheet.createRow(rowIndex - 1);
+                    cell = Utilities.getCell(row, 0);
+                    cell.setCellValue("INFORMATIONS DE LA CONVERSATION");
+
+                    rowIndex++;
+
+                    row = sheet.getRow(rowIndex++);
+                    if (row == null) row = sheet.createRow(rowIndex - 1);
+                    cell = Utilities.getCell(row, 0);
+                    cell.setCellValue("Titre:");
+                    cell = Utilities.getCell(row, 1);
+                    cell.setCellValue(Utilities.isNotBlank(conversation.getTitre())
+                            ? conversation.getTitre() : "Sans titre");
+
+                    row = sheet.getRow(rowIndex++);
+                    if (row == null) row = sheet.createRow(rowIndex - 1);
+                    cell = Utilities.getCell(row, 0);
+                    cell.setCellValue("Type:");
+                    cell = Utilities.getCell(row, 1);
+                    cell.setCellValue(conversation.getTypeConversation().getLibelle());
+
+                    row = sheet.getRow(rowIndex++);
+                    if (row == null) row = sheet.createRow(rowIndex - 1);
+                    cell = Utilities.getCell(row, 0);
+                    cell.setCellValue("Créé par:");
+                    cell = Utilities.getCell(row, 1);
+                    User creator = userRepository.findOne(conversation.getCreatedBy(), false);
+                    cell.setCellValue(creator != null
+                            ? creator.getNom() + " " + creator.getPrenoms() : "Inconnu");
+
+                    row = sheet.getRow(rowIndex++);
+                    if (row == null) row = sheet.createRow(rowIndex - 1);
+                    cell = Utilities.getCell(row, 0);
+                    cell.setCellValue("Date de création:");
+                    cell = Utilities.getCell(row, 1);
+                    cell.setCellValue(conversation.getCreatedAt() != null
+                            ? sdfDate.format(conversation.getCreatedAt()) : "");
+
+                    rowIndex += 2;
+
+                    // === PARTICIPANTS ===
+                    List<ConversationUser> participants = conversationUserRepository
+                            .findByConversationId(conversation.getId(), false);
+
+                    row = sheet.getRow(rowIndex++);
+                    if (row == null) row = sheet.createRow(rowIndex - 1);
+                    cell = Utilities.getCell(row, 0);
+                    cell.setCellValue("PARTICIPANTS (" + participants.size() + ")");
+
+                    rowIndex++;
+
+                    row = sheet.getRow(rowIndex++);
+                    if (row == null) row = sheet.createRow(rowIndex - 1);
+                    cell = Utilities.getCell(row, 0);
+                    cell.setCellValue("Nom");
+                    cell = Utilities.getCell(row, 1);
+                    cell.setCellValue("Prénoms");
+                    cell = Utilities.getCell(row, 2);
+                    cell.setCellValue("Rôle");
+                    cell = Utilities.getCell(row, 3);
+                    cell.setCellValue("Date Intégration");
+                    cell = Utilities.getCell(row, 4);
+                    cell.setCellValue("Statut");
+
+                    for (ConversationUser participant : participants) {
+                        row = sheet.getRow(rowIndex);
+                        if (row == null) row = sheet.createRow(rowIndex);
+
+                        User user = participant.getUser();
+
+                        cell = Utilities.getCell(row, 0);
+                        cell.setCellValue(user.getNom() != null ? user.getNom() : "");
+
+                        cell = Utilities.getCell(row, 1);
+                        cell.setCellValue(user.getPrenoms() != null ? user.getPrenoms() : "");
+
+                        cell = Utilities.getCell(row, 2);
+                        cell.setCellValue(Utilities.isTrue(participant.getRole())
+                                ? "Administrateur" : "Membre");
+
+                        cell = Utilities.getCell(row, 3);
+                        cell.setCellValue(participant.getCreatedAt() != null
+                                ? sdfDate.format(conversation.getCreatedAt()) : "");
+
+                        cell = Utilities.getCell(row, 4);
+                        String status = "Actif";
+                        if (Utilities.isTrue(participant.getHasDefinitivelyLeft())) {
+                            status = "Quitté définitivement";
+                        } else if (Utilities.isTrue(participant.getHasLeft())) {
+                            status = "Quitté";
+                        }
+                        cell.setCellValue(status);
+
+                        rowIndex++;
+                    }
+
+                    rowIndex += 2;
+
+                    // === MESSAGES ===
+                    List<Message> messages = messageRepository
+                            .findMessagesForUser(conversation.getId(), userId);
+
+                    row = sheet.getRow(rowIndex++);
+                    if (row == null) row = sheet.createRow(rowIndex - 1);
+                    cell = Utilities.getCell(row, 0);
+                    cell.setCellValue("MESSAGES (" + messages.size() + ")");
+
+                    rowIndex++;
+
+                    row = sheet.getRow(rowIndex++);
+                    if (row == null) row = sheet.createRow(rowIndex - 1);
+                    cell = Utilities.getCell(row, 0);
+                    cell.setCellValue("Date");
+                    cell = Utilities.getCell(row, 1);
+                    cell.setCellValue("Auteur");
+                    cell = Utilities.getCell(row, 2);
+                    cell.setCellValue("Type");
+                    cell = Utilities.getCell(row, 3);
+                    cell.setCellValue("Contenu");
+                    cell = Utilities.getCell(row, 4);
+                    cell.setCellValue("Image URL");
+
+                    for (Message message : messages) {
+                        row = sheet.getRow(rowIndex);
+                        if (row == null) row = sheet.createRow(rowIndex);
+
+                        cell = Utilities.getCell(row, 0);
+                        cell.setCellValue(message.getCreatedAt() != null
+                                ? sdfDate.format(message.getCreatedAt()) : "");
+
+                        cell = Utilities.getCell(row, 1);
+                        User author = userRepository.findOne(message.getCreatedBy(), false);
+                        cell.setCellValue(author != null
+                                ? author.getNom() + " " + author.getPrenoms() : "Inconnu");
+
+                        cell = Utilities.getCell(row, 2);
+                        cell.setCellValue(message.getTypeMessage2() != null
+                                ? message.getTypeMessage2().getLibelle() : "");
+
+                        cell = Utilities.getCell(row, 3);
+                        cell.setCellValue(Utilities.isNotBlank(message.getContent())
+                                ? message.getContent() : "");
+
+                        cell = Utilities.getCell(row, 4);
+                        cell.setCellValue(Utilities.isNotBlank(message.getImgUrl())
+                                ? message.getImgUrl() : "");
+
+                        rowIndex++;
+                    }
+
+                    inputStream.close();
+
+                    // Générer un nom de fichier unique pour cette conversation
+                    String sanitizedTitle = conversation.getTitre() != null
+                            ? conversation.getTitre().replaceAll("[^a-zA-Z0-9]", "_")
+                            : "Conversation_" + conversation.getId();
+
+                    String individualFileName = fileCount + "_" + sanitizedTitle + ".xlsx";
+                    String individualFilePath = paramsUtils.getExportPath() + File.separator +
+                            individualFileName;
+
+                    FileOutputStream outFile = new FileOutputStream(individualFilePath);
+                    workbook.write(outFile);
+                    outFile.close();
+                    workbook.close();
+
+                    generatedFiles.add(individualFilePath);
+                    fileCount++;
+
+                } catch (Exception e) {
+                    log.warning("Error exporting conversation " + conversation.getId() + ": " +
+                            e.getMessage());
+                    // Continuer avec les autres conversations
+                }
+            }
+
+            if (generatedFiles.isEmpty()) {
+                response.setStatus(functionalError.DATA_EMPTY(
+                        "Aucune conversation n'a pu être exportée", locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            // Créer le fichier ZIP
+            String zipFileName = "CONVERSATIONS_EXPORT_" + sdfFileName.format(new Date()) + ".zip";
+            String zipFilePath = paramsUtils.getExportPath() + File.separator + zipFileName;
+
+            FileOutputStream fos = new FileOutputStream(zipFilePath);
+            ZipOutputStream zos = new ZipOutputStream(fos);
+
+            for (String filePath : generatedFiles) {
+                File file = new File(filePath);
+                FileInputStream fis = new FileInputStream(file);
+
+                ZipEntry zipEntry = new ZipEntry(file.getName());
+                zos.putNextEntry(zipEntry);
+
+                byte[] buffer = new byte[1024];
+                int length;
+                while ((length = fis.read(buffer)) > 0) {
+                    zos.write(buffer, 0, length);
+                }
+
+                fis.close();
+                zos.closeEntry();
+
+                // Supprimer le fichier Excel individuel après l'avoir zippé
+                file.delete();
+            }
+
+            zos.close();
+            fos.close();
+
+            response.setHasError(Boolean.FALSE);
+            response.setCount((long) generatedFiles.size());
+            response.setStatus(functionalError.SUCCESS(
+                    "Export ZIP généré avec succès (" + generatedFiles.size() + " conversations)",
+                    locale));
+            response.setFileName(zipFileName);
+
+            log.info("----end exportAllConversations-----");
+
+        } catch (PermissionDeniedDataAccessException e) {
+            exceptionUtils.PERMISSION_DENIED_DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (DataAccessResourceFailureException e) {
+            exceptionUtils.DATA_ACCESS_RESOURCE_FAILURE_EXCEPTION(response, locale, e);
+        } catch (DataAccessException e) {
+            exceptionUtils.DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (RuntimeException e) {
+            exceptionUtils.RUNTIME_EXCEPTION(response, locale, e);
+        } catch (Exception e) {
+            exceptionUtils.EXCEPTION(response, locale, e);
+        } finally {
+            // Nettoyer les fichiers temporaires en cas d'erreur
+            if (response.isHasError()) {
+                for (String filePath : generatedFiles) {
+                    try {
+                        new File(filePath).delete();
+                    } catch (Exception ignored) {}
+                }
+            }
+
             if (response.isHasError() && response.getStatus() != null) {
                 log.info(String.format("Erreur| code: {} - message: {}",
                         response.getStatus().getCode(), response.getStatus().getMessage()));

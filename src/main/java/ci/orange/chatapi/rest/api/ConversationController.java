@@ -226,6 +226,52 @@ public class ConversationController {
         }
     }
 
+    /**
+     * Endpoint : Génère un ZIP contenant tous les exports des conversations de l'utilisateur
+     */
+    @RequestMapping(value="/export/all", method=RequestMethod.POST,
+            consumes={"application/json"}, produces={"application/json"})
+    public ResponseEntity<Response<ConversationDto>> generateAllConversationsExport(
+            @RequestBody Request<ConversationDto> request) {
+
+        HttpHeaders headers = new HttpHeaders();
+        log.info("start method /conversation/export/all");
+
+        Response<ConversationDto> response = new Response<ConversationDto>();
+        String languageID = (String) requestBasic.getAttribute("CURRENT_LANGUAGE_IDENTIFIER");
+        Locale locale = new Locale(languageID, "");
+
+        try {
+            // Validation
+            response = Validate.validateList(request, response, functionalError, locale);
+
+            if (response.isHasError()) {
+                log.warning("Validation failed: " + response.getStatus().getMessage());
+                return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
+            }
+
+            // Génération du ZIP
+            response = conversationBusiness.exportAllConversations(request, locale);
+
+            if (response.isHasError()) {
+                return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+            }
+
+            log.info("Export ZIP generated successfully. File: " + response.getFileName() +
+                    ", Count: " + response.getCount());
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(response);
+
+        } catch (Exception e) {
+            exceptionUtils.EXCEPTION(response, locale, e);
+            return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+        } finally {
+            log.info("end method /conversation/export/all");
+        }
+    }
+
 	@RequestMapping(value="/create",method=RequestMethod.POST,consumes = {"application/json"},produces={"application/json"})
     public Response<ConversationDto> create(@RequestBody Request<ConversationDto> request) {
     	log.info("start method /conversation/create");

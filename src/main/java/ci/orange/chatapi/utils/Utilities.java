@@ -595,6 +595,10 @@ public class Utilities {
 		return (list != null && !list.isEmpty());
 	}
 
+    public static <T> boolean isEmpty(List<T> list){
+        return !(list != null && !list.isEmpty());
+    }
+
 	static public String GetCode(String Value, Map<String, String> Table) {
 
 		for (Entry<String, String> entry : Table.entrySet()) {

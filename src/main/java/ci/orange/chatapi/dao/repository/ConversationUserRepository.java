@@ -56,4 +56,19 @@ public interface ConversationUserRepository extends JpaRepository<ConversationUs
             @Param("conversationId") int conversationId,
             @Param("excludeUserId") int excludeUserId
     );
+
+    @Query("""
+    SELECT cu
+    FROM ConversationUser cu
+    WHERE cu.user.id = :userId
+      AND (cu.isDeleted = false OR cu.isDeleted IS NULL)
+      AND (cu.hasLeft = false OR cu.hasLeft IS NULL)
+      AND (cu.hasDefinitivelyLeft = false OR cu.hasDefinitivelyLeft IS NULL)
+      AND (cu.hasCleaned = false OR cu.hasCleaned IS NULL)
+      AND (cu.conversation.isDeleted = false OR cu.conversation.isDeleted IS NULL)
+""")
+    List<ConversationUser> findActiveConversationsByUser(
+            @Param("userId") Integer userId
+    );
+
 }
