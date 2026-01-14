@@ -272,6 +272,75 @@ public class ConversationController {
         }
     }
 
+    /**
+     * Endpoint : Télécharge le fichier ZIP généré
+     */
+    @RequestMapping(value="/download/zip/{fileName}", method=RequestMethod.GET)
+    public ResponseEntity<Object> downloadAllConversationsZip(@PathVariable String fileName) {
+        log.info("start method /conversation/download/zip/" + fileName);
+
+        try {
+            // Validation du nom de fichier
+            if (!fileName.matches("^CONVERSATIONS_EXPORT_\\d{8}_\\d{6}\\.zip$")) {
+                log.warning("Invalid file name format: " + fileName);
+
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("hasError", true);
+                errorResponse.put("code", "INVALID_FILE_NAME");
+                errorResponse.put("message", "Format de nom de fichier invalide");
+
+                return ResponseEntity
+                        .status(HttpStatus.BAD_REQUEST)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(errorResponse);
+            }
+
+            String filePath = paramsUtils.getExportPath() + File.separator + fileName;
+            File file = new File(filePath);
+
+            if (!file.exists() || !file.isFile()) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("hasError", true);
+                errorResponse.put("code", "FILE_NOT_FOUND");
+                errorResponse.put("message", "Le fichier demandé n'existe pas");
+
+                return ResponseEntity
+                        .status(HttpStatus.NOT_FOUND)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(errorResponse);
+            }
+
+            InputStreamResource resource = new InputStreamResource(new FileInputStream(file));
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.parseMediaType("application/zip"));
+            headers.setContentDisposition(ContentDisposition.builder("attachment")
+                    .filename(fileName)
+                    .build());
+            headers.setContentLength(file.length());
+
+            log.info("ZIP download started: " + fileName);
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(resource);
+
+        } catch (Exception e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("hasError", true);
+            errorResponse.put("code", "DOWNLOAD_ERROR");
+            errorResponse.put("message", "Erreur lors du téléchargement");
+
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(errorResponse);
+
+        } finally {
+            log.info("end method /conversation/download/zip/" + fileName);
+        }
+    }
+
 	@RequestMapping(value="/create",method=RequestMethod.POST,consumes = {"application/json"},produces={"application/json"})
     public Response<ConversationDto> create(@RequestBody Request<ConversationDto> request) {
     	log.info("start method /conversation/create");
