@@ -10,11 +10,23 @@ package ci.orange.chatapi.business;
 
 import lombok.extern.java.Log;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.dao.DataAccessException;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.PermissionDeniedDataAccessException;
 import org.springframework.stereotype.Component;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.InputStream;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -56,6 +68,10 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 	private FunctionalError functionalError;
 	@PersistenceContext
 	private EntityManager em;
+    @Autowired
+    private ParamsUtils paramsUtils;
+    @Autowired
+    private ExceptionUtils exceptionUtils;
 
 	private SimpleDateFormat dateFormat;
 	private SimpleDateFormat dateTimeFormat;
@@ -64,6 +80,275 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 		dateFormat = new SimpleDateFormat("dd/MM/yyyy");
 		dateTimeFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
 	}
+
+    public Response<ConversationDto> exportConversation(Request<ConversationDto> request, Locale locale) {
+        SimpleDateFormat sdfFileName = new SimpleDateFormat("yyyyMMdd_HHmmss");
+        SimpleDateFormat sdfDate = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss");
+        Response<ConversationDto> response = new Response<ConversationDto>();
+
+        try {
+            log.info("----begin exportConversation-----");
+
+            // Validation
+            if (request.getDatas().size() != 1) {
+                response.setStatus(functionalError.REQUEST_ERROR(
+                        "Une seule conversation peut être exportée à la fois", locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            ConversationDto dto = request.getDatas().get(0);
+
+            // Definir les parametres obligatoires
+            Map<String, java.lang.Object> fieldsToVerify = new HashMap<String, java.lang.Object>();
+            fieldsToVerify.put("id", dto.getId());
+
+            if (!Validate.RequiredValue(fieldsToVerify).isGood()) {
+                response.setStatus(functionalError.FIELD_EMPTY(Validate.getValidate().getField(), locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            Integer conversationId = dto.getId();
+            Integer userId = request.getUser();
+
+            // Vérifier que la conversation existe
+            Conversation conversation = conversationRepository.findOne(conversationId, false);
+            if (conversation == null) {
+                response.setStatus(functionalError.DATA_NOT_EXIST(
+                        "Conversation inexistante: " + conversationId, locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            // Vérifier que l'utilisateur est membre
+            ConversationUser membershipOpt = conversationUserRepository
+                    .findByConversation_IdAndUser_IdAndIsDeletedFalse(conversationId, userId);
+
+            if (membershipOpt == null ) {
+                response.setStatus(functionalError.UNAUTHORIZED(
+                        "Vous n'êtes pas membre de cette conversation", locale));
+                response.setHasError(true);
+                return response;
+            }
+
+            // Récupérer les messages visibles pour cet utilisateur
+            List<Message> messages = messageRepository.findMessagesForUser(conversationId, userId);
+
+            // Récupérer les participants
+            List<ConversationUser> participants = conversationUserRepository
+                    .findByConversationId(conversationId, false);
+
+            // Charger le template Excel
+            ClassPathResource resource = new ClassPathResource(
+                    "templates/excel/conversation_export_template.xlsx");
+            InputStream inputStream = resource.getInputStream();
+            XSSFWorkbook workbook = new XSSFWorkbook(inputStream);
+            XSSFSheet sheet = workbook.getSheetAt(0);
+
+            Cell cell = null;
+            Row row = null;
+            int rowIndex = 0;
+
+            // === SECTION 1 : Informations de la conversation ===
+            row = sheet.getRow(rowIndex++);
+            if (row == null) row = sheet.createRow(rowIndex - 1);
+            cell = Utilities.getCell(row, 0);
+            cell.setCellValue("INFORMATIONS DE LA CONVERSATION");
+
+            rowIndex++; // Ligne vide
+
+            // Titre
+            row = sheet.getRow(rowIndex++);
+            if (row == null) row = sheet.createRow(rowIndex - 1);
+            cell = Utilities.getCell(row, 0);
+            cell.setCellValue("Titre:");
+            cell = Utilities.getCell(row, 1);
+            cell.setCellValue(Utilities.isNotBlank(conversation.getTitre())
+                    ? conversation.getTitre() : "Sans titre");
+
+            // Type
+            row = sheet.getRow(rowIndex++);
+            if (row == null) row = sheet.createRow(rowIndex - 1);
+            cell = Utilities.getCell(row, 0);
+            cell.setCellValue("Type:");
+            cell = Utilities.getCell(row, 1);
+            cell.setCellValue(conversation.getTypeConversation().getLibelle());
+
+            // Créateur
+            row = sheet.getRow(rowIndex++);
+            if (row == null) row = sheet.createRow(rowIndex - 1);
+            cell = Utilities.getCell(row, 0);
+            cell.setCellValue("Créé par:");
+            cell = Utilities.getCell(row, 1);
+            User creator = userRepository.findOne(conversation.getCreatedBy(), false);
+            if (creator != null) {
+                cell.setCellValue(creator.getNom() + " " + creator.getPrenoms());
+            } else {
+                cell.setCellValue("Inconnu");
+            }
+
+            // Date de création
+            row = sheet.getRow(rowIndex++);
+            if (row == null) row = sheet.createRow(rowIndex - 1);
+            cell = Utilities.getCell(row, 0);
+            cell.setCellValue("Date de création:");
+            cell = Utilities.getCell(row, 1);
+            cell.setCellValue(conversation.getCreatedAt() != null
+                    ? sdfDate.format(conversation.getCreatedAt()) : "");
+
+            rowIndex++; // Ligne vide
+
+            // === SECTION 2 : Participants ===
+            row = sheet.getRow(rowIndex++);
+            if (row == null) row = sheet.createRow(rowIndex - 1);
+            cell = Utilities.getCell(row, 0);
+            cell.setCellValue("PARTICIPANTS (" + participants.size() + ")");
+
+            rowIndex++; // Ligne vide
+
+            // En-têtes participants
+            row = sheet.getRow(rowIndex++);
+            if (row == null) row = sheet.createRow(rowIndex - 1);
+            cell = Utilities.getCell(row, 0);
+            cell.setCellValue("Nom");
+            cell = Utilities.getCell(row, 1);
+            cell.setCellValue("Prénoms");
+            cell = Utilities.getCell(row, 2);
+            cell.setCellValue("Rôle");
+            cell = Utilities.getCell(row, 3);
+            cell.setCellValue("Date Intégration");
+            cell = Utilities.getCell(row, 4);
+            cell.setCellValue("Statut");
+
+            // Liste des participants
+            for (ConversationUser participant : participants) {
+                row = sheet.getRow(rowIndex);
+                if (row == null) row = sheet.createRow(rowIndex);
+
+                User user = participant.getUser();
+
+                cell = Utilities.getCell(row, 0);
+                cell.setCellValue(user.getNom() != null ? user.getNom() : "");
+
+                cell = Utilities.getCell(row, 1);
+                cell.setCellValue(user.getPrenoms() != null ? user.getPrenoms() : "");
+
+                cell = Utilities.getCell(row, 2);
+                cell.setCellValue(Utilities.isTrue(participant.getRole())
+                        ? "Administrateur" : "Membre");
+
+                cell = Utilities.getCell(row, 3);
+                cell.setCellValue(participant.getCreatedAt() != null
+                        ? sdfDate.format(conversation.getCreatedAt()) : "");
+
+                cell = Utilities.getCell(row, 4);
+                String status = "Actif";
+                if (Utilities.isTrue(participant.getHasDefinitivelyLeft())) {
+                    status = "Quitté définitivement";
+                } else if (Utilities.isTrue(participant.getHasLeft())) {
+                    status = "Quitté";
+                }
+                cell.setCellValue(status);
+
+                rowIndex++;
+            }
+
+            rowIndex += 2; // Lignes vides
+
+            // === SECTION 3 : Messages ===
+            row = sheet.getRow(rowIndex++);
+            if (row == null) row = sheet.createRow(rowIndex - 1);
+            cell = Utilities.getCell(row, 0);
+            cell.setCellValue("MESSAGES (" + messages.size() + ")");
+
+            rowIndex++; // Ligne vide
+
+            // En-têtes messages
+            row = sheet.getRow(rowIndex++);
+            if (row == null) row = sheet.createRow(rowIndex - 1);
+            cell = Utilities.getCell(row, 0);
+            cell.setCellValue("Date");
+            cell = Utilities.getCell(row, 1);
+            cell.setCellValue("Auteur");
+            cell = Utilities.getCell(row, 2);
+            cell.setCellValue("Type");
+            cell = Utilities.getCell(row, 3);
+            cell.setCellValue("Contenu");
+            cell = Utilities.getCell(row, 4);
+            cell.setCellValue("Image URL");
+
+            // Liste des messages
+            for (Message message : messages) {
+                row = sheet.getRow(rowIndex);
+                if (row == null) row = sheet.createRow(rowIndex);
+
+                cell = Utilities.getCell(row, 0);
+                cell.setCellValue(message.getCreatedAt() != null
+                        ? sdfDate.format(message.getCreatedAt()) : "");
+
+                cell = Utilities.getCell(row, 1);
+                User author = userRepository.findOne(message.getCreatedBy(), false);
+                if (author != null) {
+                    cell.setCellValue(author.getNom() + " " + author.getPrenoms());
+                } else {
+                    cell.setCellValue("Inconnu");
+                }
+
+                cell = Utilities.getCell(row, 2);
+                cell.setCellValue(message.getTypeMessage2() != null
+                        ? message.getTypeMessage2().getLibelle() : "");
+
+                cell = Utilities.getCell(row, 3);
+                cell.setCellValue(Utilities.isNotBlank(message.getContent())
+                        ? message.getContent() : "");
+
+                cell = Utilities.getCell(row, 4);
+                cell.setCellValue(Utilities.isNotBlank(message.getImgUrl())
+                        ? message.getImgUrl() : "");
+
+                rowIndex++;
+            }
+
+            inputStream.close();
+
+            // Générer le nom du fichier
+            String fileName = "CONVERSATION_EXPORT_" + sdfFileName.format(new Date()) + ".xlsx";
+            String filePath = paramsUtils.getExportPath() + File.separator + fileName;
+
+            // Écrire le fichier
+            FileOutputStream outFile = new FileOutputStream(filePath);
+            workbook.write(outFile);
+            outFile.close();
+            workbook.close();
+
+            response.setHasError(Boolean.FALSE);
+            response.setCount((long) messages.size());
+            response.setStatus(functionalError.SUCCESS("Export généré avec succès", locale));
+            response.setFileName(fileName);
+
+            log.info("----end exportConversation-----");
+
+        } catch (PermissionDeniedDataAccessException e) {
+            exceptionUtils.PERMISSION_DENIED_DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (DataAccessResourceFailureException e) {
+            exceptionUtils.DATA_ACCESS_RESOURCE_FAILURE_EXCEPTION(response, locale, e);
+        } catch (DataAccessException e) {
+            exceptionUtils.DATA_ACCESS_EXCEPTION(response, locale, e);
+        } catch (RuntimeException e) {
+            exceptionUtils.RUNTIME_EXCEPTION(response, locale, e);
+        } catch (Exception e) {
+            exceptionUtils.EXCEPTION(response, locale, e);
+        } finally {
+            if (response.isHasError() && response.getStatus() != null) {
+                log.info(String.format("Erreur| code: {} - message: {}",
+                        response.getStatus().getCode(), response.getStatus().getMessage()));
+                throw new RuntimeException(response.getStatus().getCode() + ";" +
+                        response.getStatus().getMessage());
+            }
+        }
+        return response;
+    }
 	
 	/**
 	 * create Conversation by using ConversationDto as object.

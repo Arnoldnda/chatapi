@@ -17,6 +17,8 @@ import org.apache.commons.lang.LocaleUtils;
 import org.apache.commons.lang.NullArgumentException;
 import org.apache.commons.lang.RandomStringUtils;
 import org.apache.commons.lang3.text.StrSubstitutor;
+import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.Row;
 import org.joda.time.format.DateTimeFormat;
 import org.json.JSONObject;
 import org.slf4j.Logger;
@@ -711,6 +713,10 @@ public class Utilities {
     public static String extractFileName(String url) {
         if (url == null || url.isEmpty()) return "";
         return url.substring(url.lastIndexOf('/') + 1);
+    }
+
+    public static Cell getCell(Row row, Integer index) {
+        return (row.getCell(index) == null) ? row.createCell(index) : row.getCell(index);
     }
 
 

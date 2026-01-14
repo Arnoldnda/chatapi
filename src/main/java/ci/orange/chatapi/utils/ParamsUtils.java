@@ -43,6 +43,9 @@ public class ParamsUtils {
     @Value("${file.upload.base-url}")
     private String baseUrl;
 
+    @Value(("${app.export.path}"))
+    private String exportPath;
+
     public String getFullDirectory(@NonNull String path) {
         String rootPath = getRootFilesPath();
         return Utilities.createFullPath(rootPath, path);
