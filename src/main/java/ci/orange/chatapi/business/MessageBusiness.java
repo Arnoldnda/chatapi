@@ -856,12 +856,27 @@ public class MessageBusiness implements IBasicBusiness<Request<MessageDto>, Resp
 		List<Message> items 			 = messageRepository.getByCriteria(request, em, locale);
 
 		if (items != null && !items.isEmpty()) {
+            Integer user_id = request.getUser() != null ? request.getUser() : null;
 			List<MessageDto> itemsDto = (Utilities.isTrue(request.getIsSimpleLoading())) ? MessageTransformer.INSTANCE.toLiteDtos(items) : MessageTransformer.INSTANCE.toDtos(items);
 
 			final int size = items.size();
 			List<String>  listOfError      = Collections.synchronizedList(new ArrayList<String>());
 			itemsDto.parallelStream().forEach(dto -> {
 				try {
+
+                    // verifier si le message est suprimé pour l'utilisateur
+                    if (user_id != null) {
+                        Optional<HistoriqueSuppressionMessage> hms = historiqueSuppressionMessageRepository
+                                .findByMessage_IdAndUser_IdAndIsDeletedFalse(
+                                        dto.getId(), user_id
+                                );
+                        if (hms.isPresent()) {
+                            dto.setIsHiden(hms.get().getIsHidden());
+                        } else {
+                            dto.setIsHiden(false);
+                        }
+
+                    }
 					dto = getFullInfos(dto, size, request.getIsSimpleLoading(), locale);
 				} catch (Exception e) {
 					listOfError.add(e.getMessage());

@@ -35,7 +35,9 @@ public class ConversationDto extends _ConversationDto{
     private List<Integer> participantIds           ;
 
     // Pour le premier message de la conversation privé
-    private MessageDto firstMessage                 ;
+    private MessageDto LastMessage                 ;
+
+    private Integer userId ;
     
 	//----------------------------------------------------------------------
     // clone METHOD

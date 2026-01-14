@@ -1050,6 +1050,14 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 		if (Utilities.isTrue(isSimpleLoading)) {
 			return dto;
 		}
+
+
+        // récupéré le dernier message d'une conversation
+        List<Message> lastMessage = messageRepository.findLastVisibleMessageByConversation(dto.getId()) ;
+        if (Utilities.isNotEmpty(lastMessage) ) {
+            dto.setLastMessage(MessageTransformer.INSTANCE.toDto(lastMessage.get(0)));
+        }
+
 		if (size > 1) {
 			return dto;
 		}
