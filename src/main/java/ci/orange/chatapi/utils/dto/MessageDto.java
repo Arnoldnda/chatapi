@@ -33,7 +33,9 @@ public class MessageDto extends _MessageDto{
 
     private String    statusLibelle               ;
     private Integer  receiverId                   ;
-    private Boolean isHiden;
+    private Boolean isHiden                       ;
+    private UserDto infoCreator                   ;
+    private String conversationType               ;
     
 	//----------------------------------------------------------------------
     // clone METHOD

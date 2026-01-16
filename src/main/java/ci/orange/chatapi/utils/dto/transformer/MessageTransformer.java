@@ -56,6 +56,12 @@ public interface MessageTransformer {
 		}
 		MessageDto dto = new MessageDto();
 		dto.setId( entity.getId() );
+        dto.setContent(entity.getContent());
+        dto.setImgUrl(entity.getImgUrl());
+        dto.setConversationId(entity.getConversation().getId());
+        dto.setConversationType(entity.getConversation().getTypeConversation().getCode());
+        dto.setCreatedAt(String.valueOf(entity.getCreatedAt()));
+        dto.setCreatedBy(entity.getCreatedBy());
 		return dto;
     }
 

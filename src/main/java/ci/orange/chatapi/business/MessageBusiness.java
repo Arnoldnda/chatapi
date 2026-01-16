@@ -10,6 +10,7 @@ package ci.orange.chatapi.business;
 
 import lombok.extern.java.Log;
 import org.apache.commons.lang3.StringUtils;
+import org.mapstruct.control.MappingControl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -912,6 +913,12 @@ public class MessageBusiness implements IBasicBusiness<Request<MessageDto>, Resp
 	 */
 	private MessageDto getFullInfos(MessageDto dto, Integer size, Boolean isSimpleLoading, Locale locale) throws Exception {
 		// put code here
+
+        // recupéreé l'info sur le créateur du message
+        User creator = userRepository.findOne(dto.getCreatedBy(), false);
+        if (creator != null) {
+            dto.setInfoCreator(UserTransformer.INSTANCE.toDto(creator));
+        }
 
 		if (Utilities.isTrue(isSimpleLoading)) {
 			return dto;
