@@ -54,7 +54,7 @@ public interface UserTransformer {
 		dto.setId( entity.getId() );
 		dto.setNom( entity.getNom() );
 		dto.setPrenoms( entity.getPrenoms() );
-		dto.setLogin( entity.getLogin() );
+//		dto.setLogin( entity.getLogin() );
 		return dto;
     }
 

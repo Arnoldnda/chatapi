@@ -1002,16 +1002,46 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 		log.info("----begin get Conversation-----");
 
 		Response<ConversationDto> response = new Response<ConversationDto>();
-		List<Conversation> items 			 = conversationRepository.getByCriteria(request, em, locale);
+
+		// Vérifier si userId est présent dans le DTO
+		ConversationDto dto = request.getData() != null ? request.getData() : 
+			(request.getDatas() != null && !request.getDatas().isEmpty() ? request.getDatas().get(0) : null);
+		
+		Integer userId = (dto != null && dto.getUserId() != null) ? dto.getUserId() : null;
+		
+		List<Conversation> items;
+		Long count;
+		
+		if (userId != null) {
+			// Utiliser la méthode personnalisée pour les conversations actives
+			log.info("Using findActiveConversationsByUserId for userId: " + userId);
+			items = conversationRepository.findActiveConversationsByUserId(userId);
+			count = conversationRepository.countActiveConversationsByUserId(userId);
+			
+			// Appliquer la pagination manuellement si nécessaire
+			if (request.getIndex() != null && request.getSize() != null && items != null) {
+				int startIndex = request.getIndex() * request.getSize();
+				int endIndex = Math.min(startIndex + request.getSize(), items.size());
+				if (startIndex < items.size()) {
+					items = items.subList(startIndex, endIndex);
+				} else {
+					items = new ArrayList<>();
+				}
+			}
+		} else {
+			// Comportement normal avec getByCriteria du repository de base
+			items = conversationRepository.getByCriteria(request, em, locale);
+			count = conversationRepository.count(request, em, locale);
+		}
 
 		if (items != null && !items.isEmpty()) {
 			List<ConversationDto> itemsDto = (Utilities.isTrue(request.getIsSimpleLoading())) ? ConversationTransformer.INSTANCE.toLiteDtos(items) : ConversationTransformer.INSTANCE.toDtos(items);
 
 			final int size = items.size();
 			List<String>  listOfError      = Collections.synchronizedList(new ArrayList<String>());
-			itemsDto.parallelStream().forEach(dto -> {
+			itemsDto.parallelStream().forEach(dtoItem -> {
 				try {
-					dto = getFullInfos(dto, size, request.getIsSimpleLoading(), locale);
+					dtoItem = getFullInfos(dtoItem, size, request.getIsSimpleLoading(), locale);
 				} catch (Exception e) {
 					listOfError.add(e.getMessage());
 					e.printStackTrace();
@@ -1022,11 +1052,12 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 				throw new RuntimeException(StringUtils.join(objArray, ", "));
 			}
 			response.setItems(itemsDto);
-			response.setCount(conversationRepository.count(request, em, locale));
+			response.setCount(count);
 			response.setHasError(false);
 		} else {
 			response.setStatus(functionalError.DATA_EMPTY("conversation", locale));
 			response.setHasError(false);
+			response.setCount(count != null ? count : 0L);
 			return response;
 		}
 
@@ -1051,16 +1082,24 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 			return dto;
 		}
 
-
         // récupéré le dernier message d'une conversation
         List<Message> lastMessage = messageRepository.findLastVisibleMessageByConversation(dto.getId()) ;
         if (Utilities.isNotEmpty(lastMessage) ) {
             dto.setLastMessage(MessageTransformer.INSTANCE.toDto(lastMessage.get(0)));
+        } else {
+            dto.setLastMessage(null);
         }
 
 		if (size > 1) {
 			return dto;
 		}
+
+//        // récupéré la liste des participants de la conversation
+//        List<ConversationUser> listParticipant = conversationUserRepository.findByConversationId(
+//                dto.getId(), false);
+//        if (Utilities.isNotEmpty(listParticipant)) {
+//            dto.setListeParticipant(ConversationUserTransformer.INSTANCE.toDtos(listParticipant));
+//        }
 
 		return dto;
 	}

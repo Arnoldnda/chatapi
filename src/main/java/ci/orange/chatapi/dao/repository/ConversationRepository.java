@@ -49,4 +49,39 @@ public interface ConversationRepository extends JpaRepository<Conversation, Inte
             @Param("user2") Integer participant
     );
 
+    /**
+     * Récupère toutes les conversations actives d'un utilisateur
+     * (conversations non supprimées dont l'utilisateur est membre et hasCleaned = false)
+     *
+     * @param userId ID de l'utilisateur
+     * @return Liste des conversations actives
+     */
+    @Query("""
+    SELECT DISTINCT c
+    FROM Conversation c
+    JOIN ConversationUser cu ON cu.conversation.id = c.id
+    WHERE cu.user.id = :userId
+      AND (c.isDeleted = false OR c.isDeleted IS NULL)
+      AND (cu.hasCleaned = false OR cu.hasCleaned IS NULL)
+    ORDER BY c.createdAt DESC
+    """)
+    List<Conversation> findActiveConversationsByUserId(@Param("userId") Integer userId);
+
+    /**
+     * Compte les conversations actives d'un utilisateur
+     * (conversations non supprimées dont l'utilisateur est membre et hasCleaned = false)
+     *
+     * @param userId ID de l'utilisateur
+     * @return Nombre de conversations actives
+     */
+    @Query("""
+    SELECT COUNT(DISTINCT c.id)
+    FROM Conversation c
+    JOIN ConversationUser cu ON cu.conversation.id = c.id
+    WHERE cu.user.id = :userId
+      AND (c.isDeleted = false OR c.isDeleted IS NULL)
+      AND (cu.hasCleaned = false OR cu.hasCleaned IS NULL)
+    """)
+    Long countActiveConversationsByUserId(@Param("userId") Integer userId);
+
 }
