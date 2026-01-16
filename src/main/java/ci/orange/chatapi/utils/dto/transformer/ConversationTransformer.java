@@ -55,6 +55,10 @@ public interface ConversationTransformer {
 		}
 		ConversationDto dto = new ConversationDto();
 		dto.setId( entity.getId() );
+        dto.setTitre(entity.getTitre());
+        dto.setTypeConversationCode(entity.getTypeConversation().getCode());
+        dto.setCreatedAt(String.valueOf(entity.getCreatedAt()));
+        dto.setCreatedBy( entity.getCreatedBy());
 		return dto;
     }
 

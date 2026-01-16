@@ -1077,11 +1077,6 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 	 */
 	private ConversationDto getFullInfos(ConversationDto dto, Integer size, Boolean isSimpleLoading, Locale locale) throws Exception {
 		// put code here
-
-		if (Utilities.isTrue(isSimpleLoading)) {
-			return dto;
-		}
-
         // récupéré le dernier message d'une conversation
         List<Message> lastMessage = messageRepository.findLastVisibleMessageByConversation(dto.getId()) ;
         if (Utilities.isNotEmpty(lastMessage) ) {
@@ -1089,6 +1084,10 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
         } else {
             dto.setLastMessage(null);
         }
+
+		if (Utilities.isTrue(isSimpleLoading)) {
+			return dto;
+		}
 
 		if (size > 1) {
 			return dto;
