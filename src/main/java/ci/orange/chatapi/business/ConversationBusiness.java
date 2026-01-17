@@ -1076,7 +1076,7 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 	 * @throws Exception
 	 */
 	private ConversationDto getFullInfos(ConversationDto dto, Integer size, Boolean isSimpleLoading, Locale locale) throws Exception {
-		// put code here
+        // put code here
         // récupéré le dernier message d'une conversation
         List<Message> lastMessage = messageRepository.findLastVisibleMessageByConversation(dto.getId()) ;
         if (Utilities.isNotEmpty(lastMessage) ) {
@@ -1085,13 +1085,28 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
             dto.setLastMessage(null);
         }
 
-		if (Utilities.isTrue(isSimpleLoading)) {
-			return dto;
-		}
+        // Récupérer les participants de la conversation pour remplir participantIds
+        List<ConversationUser> listParticipant = conversationUserRepository.findByConversationId(
+                dto.getId(), false);
+        if (Utilities.isNotEmpty(listParticipant)) {
+            List<Integer> participantIds = new ArrayList<>();
+            for (ConversationUser cu : listParticipant) {
+                if (cu.getUser() != null && cu.getUser().getId() != null) {
+                    participantIds.add(cu.getUser().getId());
+                }
+            }
+            dto.setParticipantIds(participantIds);
+        } else {
+            dto.setParticipantIds(new ArrayList<>());
+        }
 
-		if (size > 1) {
-			return dto;
-		}
+        if (Utilities.isTrue(isSimpleLoading)) {
+            return dto;
+        }
+
+        if (size > 1) {
+            return dto;
+        }
 
 //        // récupéré la liste des participants de la conversation
 //        List<ConversationUser> listParticipant = conversationUserRepository.findByConversationId(
@@ -1100,6 +1115,6 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 //            dto.setListeParticipant(ConversationUserTransformer.INSTANCE.toDtos(listParticipant));
 //        }
 
-		return dto;
+        return dto;
 	}
 }
