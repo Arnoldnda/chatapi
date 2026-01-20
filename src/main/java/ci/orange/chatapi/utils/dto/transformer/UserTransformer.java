@@ -37,9 +37,9 @@ public interface UserTransformer {
 
 	@FullTransformerQualifier
 	@Mappings({
-		@Mapping(source="entity.createdAt", dateFormat="dd/MM/yyyy",target="createdAt"),
-		@Mapping(source="entity.updatedAt", dateFormat="dd/MM/yyyy",target="updatedAt"),
-		@Mapping(source="entity.deletedAt", dateFormat="dd/MM/yyyy",target="deletedAt"),
+		@Mapping(source="entity.createdAt", dateFormat="dd/MM/yyyy HH:mm:ss",target="createdAt"),
+		@Mapping(source="entity.updatedAt", dateFormat="dd/MM/yyyy HH:mm:ss",target="updatedAt"),
+		@Mapping(source="entity.deletedAt", dateFormat="dd/MM/yyyy HH:mm:ss",target="deletedAt"),
 	})
 	UserDto toDto(User entity) throws ParseException;
 
@@ -74,9 +74,9 @@ public interface UserTransformer {
 		@Mapping(source="dto.nom", target="nom"),
 		@Mapping(source="dto.prenoms", target="prenoms"),
 		@Mapping(source="dto.login", target="login"),
-		@Mapping(source="dto.createdAt", dateFormat="dd/MM/yyyy",target="createdAt"),
-		@Mapping(source="dto.updatedAt", dateFormat="dd/MM/yyyy",target="updatedAt"),
-		@Mapping(source="dto.deletedAt", dateFormat="dd/MM/yyyy",target="deletedAt"),
+		@Mapping(source="dto.createdAt", dateFormat="dd/MM/yyyy HH:mm:ss",target="createdAt"),
+		@Mapping(source="dto.updatedAt", dateFormat="dd/MM/yyyy HH:mm:ss",target="updatedAt"),
+		@Mapping(source="dto.deletedAt", dateFormat="dd/MM/yyyy HH:mm:ss",target="deletedAt"),
 		@Mapping(source="dto.createdBy", target="createdBy"),
 		@Mapping(source="dto.updatedBy", target="updatedBy"),
 		@Mapping(source="dto.deletedBy", target="deletedBy"),
