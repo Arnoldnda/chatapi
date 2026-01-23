@@ -136,7 +136,7 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
             }
 
             // Récupérer les messages visibles pour cet utilisateur
-            List<Message> messages = messageRepository.findMessagesForUser(conversationId, userId);
+            List<Message> messages = messageRepository.findMessagesForUserComplete(conversationId, userId);
 
             // Récupérer les participants
             List<ConversationUser> participants = conversationUserRepository
@@ -502,7 +502,7 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 
                     // === MESSAGES ===
                     List<Message> messages = messageRepository
-                            .findMessagesForUser(conversation.getId(), userId);
+                            .findMessagesForUserComplete(conversation.getId(), userId);
 
                     row = sheet.getRow(rowIndex++);
                     if (row == null) row = sheet.createRow(rowIndex - 1);
@@ -1041,6 +1041,18 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 			List<String>  listOfError      = Collections.synchronizedList(new ArrayList<String>());
 			itemsDto.parallelStream().forEach(dtoItem -> {
 				try {
+                    // fait la recupération du dernier message d'une conversation
+                    // facilite la récupération de l'user acteur
+                     if (userId != null ) {
+                         // récupéré le dernier message d'une conversation
+                         Optional<Message> lastMessage = messageRepository.findLastMessageForUser(dtoItem.getId(), userId) ;
+                         if (lastMessage.isPresent() ) {
+                             dtoItem.setLastMessage(MessageTransformer.INSTANCE.toDto(lastMessage.get()));
+                         } else {
+                             dtoItem.setLastMessage(null);
+                         }
+                     }
+
 					dtoItem = getFullInfos(dtoItem, size, request.getIsSimpleLoading(), locale);
 				} catch (Exception e) {
 					listOfError.add(e.getMessage());
@@ -1077,14 +1089,6 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
 	 */
 	private ConversationDto getFullInfos(ConversationDto dto, Integer size, Boolean isSimpleLoading, Locale locale) throws Exception {
         // put code here
-        // récupéré le dernier message d'une conversation
-        List<Message> lastMessage = messageRepository.findLastVisibleMessageByConversation(dto.getId()) ;
-        if (Utilities.isNotEmpty(lastMessage) ) {
-            dto.setLastMessage(MessageTransformer.INSTANCE.toDto(lastMessage.get(0)));
-        } else {
-            dto.setLastMessage(null);
-        }
-
         // Récupérer les participants de la conversation pour remplir participantIds
         List<ConversationUser> listParticipant = conversationUserRepository.findByConversationId(
                 dto.getId(), false);
@@ -1107,13 +1111,6 @@ public class ConversationBusiness implements IBasicBusiness<Request<Conversation
         if (size > 1) {
             return dto;
         }
-
-//        // récupéré la liste des participants de la conversation
-//        List<ConversationUser> listParticipant = conversationUserRepository.findByConversationId(
-//                dto.getId(), false);
-//        if (Utilities.isNotEmpty(listParticipant)) {
-//            dto.setListeParticipant(ConversationUserTransformer.INSTANCE.toDtos(listParticipant));
-//        }
 
         return dto;
 	}
