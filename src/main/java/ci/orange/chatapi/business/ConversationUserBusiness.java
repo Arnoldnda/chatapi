@@ -178,6 +178,8 @@ public class ConversationUserBusiness implements IBasicBusiness<Request<Conversa
                     existing.setHasLeft(false);
                     existing.setRecreatedAt(Utilities.getCurrentDate());
                     existing.setRecreatedBy(actorId);
+                    existing.setHasCleaned(false); // au cas où il aurait suprimé la conversation (elle réapparais)
+                    existing.setRole(false);
                     existing.setUpdatedAt(Utilities.getCurrentDate());
                     existing.setUpdatedBy(actorId);
                     existing.setIsDeleted(false);

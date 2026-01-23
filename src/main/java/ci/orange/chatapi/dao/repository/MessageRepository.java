@@ -52,6 +52,53 @@ ORDER BY m.createdAt ASC
             @Param("conversationId") Integer conversationId
     );
 
+    /**
+     * Récupère les messages d'une conversation pour un utilisateur en tenant compte :
+     * - Des messages après la création de l'utilisateur dans le groupe (ConversationUser.createdAt)
+     * - Des périodes d'absence (leftAt -> recreatedAt)
+     * - Du cas où l'utilisateur a quitté définitivement (definitivelyLeftAt)
+     * 
+     * @param conversationId ID de la conversation
+     * @param userId ID de l'utilisateur
+     * @return Liste des messages visibles pour l'utilisateur
+     */
+    @Query("""
+SELECT m
+FROM Message m
+JOIN ConversationUser cu ON cu.conversation.id = m.conversation.id
+WHERE m.conversation.id = :conversationId
+  AND cu.user.id = :userId
+  AND (m.isDeleted = false OR m.isDeleted IS NULL)
+  AND (cu.isDeleted = false OR cu.isDeleted IS NULL)
+  AND m.createdAt >= cu.createdAt
+  AND (
+      (cu.leftAt IS NULL)
+    
+      OR (cu.leftAt IS NOT NULL
+          AND cu.recreatedAt IS NULL
+          AND m.createdAt < cu.leftAt)
+      
+      OR (cu.leftAt IS NOT NULL
+          AND cu.recreatedAt IS NOT NULL
+          AND (cu.hasDefinitivelyLeft = false OR cu.hasDefinitivelyLeft IS NULL)
+          AND (m.createdAt < cu.leftAt OR m.createdAt >= cu.recreatedAt))
+      
+      OR (cu.leftAt IS NOT NULL
+          AND cu.recreatedAt IS NOT NULL
+          AND cu.hasDefinitivelyLeft = true
+          AND cu.definitivelyLeftAt IS NOT NULL
+          AND (m.createdAt < cu.leftAt OR
+               (m.createdAt >= cu.recreatedAt AND m.createdAt < cu.definitivelyLeftAt)))
+  )
+ORDER BY m.createdAt DESC
+""")
+    List<Message> findMessagesForUserWithAbsenceFilter(
+            @Param("conversationId") Integer conversationId,
+            @Param("userId") Integer userId
+    );
+
+
+
 }
 
 

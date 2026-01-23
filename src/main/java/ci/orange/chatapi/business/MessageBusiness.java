@@ -854,31 +854,77 @@ public class MessageBusiness implements IBasicBusiness<Request<MessageDto>, Resp
 		log.info("----begin get Message-----");
 
 		Response<MessageDto> response = new Response<MessageDto>();
-		List<Message> items 			 = messageRepository.getByCriteria(request, em, locale);
+		Integer user_id = request.getUser() != null ? request.getUser() : null;
+		
+		// Extraire conversationId de la requête
+		Integer conversationId = null;
+		MessageDto dto = request.getData() != null ? request.getData() : 
+			(request.getDatas() != null && !request.getDatas().isEmpty() ? request.getDatas().get(0) : null);
+		if (dto != null && dto.getConversationId() != null) {
+			conversationId = dto.getConversationId();
+		}
+		
+		List<Message> items;
+		Long count;
+		
+		// Vérifier si on doit utiliser la requête JPQL personnalisée pour les groupes
+		if (user_id != null && conversationId != null) {
+			// Vérifier si c'est un groupe
+			Conversation conv = conversationRepository.findOne(conversationId, false);
+			if (conv != null && conv.getTypeConversation() != null 
+					&& Utilities.areEquals("GROUP", conv.getTypeConversation().getCode() ) ) {
+				// Utiliser la requête JPQL personnalisée pour filtrer selon les périodes d'absence
+				log.info("Using findMessagesForUserWithAbsenceFilter for group conversationId: " + conversationId + ", userId: " + user_id);
+				items = messageRepository.findMessagesForUserWithAbsenceFilter(conversationId, user_id);
+				
+				// Appliquer la pagination manuellement si nécessaire
+				if (request.getIndex() != null && request.getSize() != null && items != null) {
+					int startIndex = request.getIndex() * request.getSize();
+					int endIndex = Math.min(startIndex + request.getSize(), items.size());
+					if (startIndex < items.size()) {
+						items = items.subList(startIndex, endIndex);
+					} else {
+						items = new ArrayList<>();
+					}
+				}
+				
+				// Pour le count, on utilise la taille de la liste complète (avant pagination)
+				// On doit refaire la requête sans pagination pour avoir le count exact
+				List<Message> allItems = messageRepository.findMessagesForUserWithAbsenceFilter(conversationId, user_id);
+				count = allItems != null ? (long) allItems.size() : 0L;
+			} else {
+				// Conversation privée ou autre : utiliser la méthode standard
+				items = messageRepository.getByCriteria(request, em, locale);
+				count = messageRepository.count(request, em, locale);
+			}
+		} else {
+			// Pas d'utilisateur ou pas de conversationId : utiliser la méthode standard
+			items = messageRepository.getByCriteria(request, em, locale);
+			count = messageRepository.count(request, em, locale);
+		}
 
 		if (items != null && !items.isEmpty()) {
-            Integer user_id = request.getUser() != null ? request.getUser() : null;
 			List<MessageDto> itemsDto = (Utilities.isTrue(request.getIsSimpleLoading())) ? MessageTransformer.INSTANCE.toLiteDtos(items) : MessageTransformer.INSTANCE.toDtos(items);
 
 			final int size = items.size();
 			List<String>  listOfError      = Collections.synchronizedList(new ArrayList<String>());
-			itemsDto.parallelStream().forEach(dto -> {
+			itemsDto.parallelStream().forEach(msgDto -> {
 				try {
 
                     // verifier si le message est suprimé pour l'utilisateur
                     if (user_id != null) {
                         Optional<HistoriqueSuppressionMessage> hms = historiqueSuppressionMessageRepository
                                 .findByMessage_IdAndUser_IdAndIsDeletedFalse(
-                                        dto.getId(), user_id
+                                        msgDto.getId(), user_id
                                 );
                         if (hms.isPresent()) {
-                            dto.setIsHiden(hms.get().getIsHidden());
+                            msgDto.setIsHiden(hms.get().getIsHidden());
                         } else {
-                            dto.setIsHiden(false);
+                            msgDto.setIsHiden(false);
                         }
 
                     }
-					dto = getFullInfos(dto, size, request.getIsSimpleLoading(), locale);
+					msgDto = getFullInfos(msgDto, size, request.getIsSimpleLoading(), locale);
 				} catch (Exception e) {
 					listOfError.add(e.getMessage());
 					e.printStackTrace();
@@ -889,7 +935,7 @@ public class MessageBusiness implements IBasicBusiness<Request<MessageDto>, Resp
 				throw new RuntimeException(StringUtils.join(objArray, ", "));
 			}
 			response.setItems(itemsDto);
-			response.setCount(messageRepository.count(request, em, locale));
+			response.setCount(count);
 			response.setHasError(false);
 		} else {
 			response.setStatus(functionalError.DATA_EMPTY("message", locale));
@@ -899,6 +945,80 @@ public class MessageBusiness implements IBasicBusiness<Request<MessageDto>, Resp
 
 		log.info("----end get Message-----");
 		return response;
+	}
+
+	/**
+	 * Filtre les messages selon les périodes d'absence pour les cas complexes
+	 * (plusieurs cycles sortie/retour). Cette méthode est utilisée en complément
+	 * de la requête JPQL pour gérer les cas où un utilisateur a plusieurs périodes d'absence.
+	 * 
+	 * Note: Actuellement, le modèle de données ne supporte qu'une seule période d'absence
+	 * par ConversationUser (leftAt -> recreatedAt). Cette méthode est prévue pour
+	 * d'éventuelles évolutions futures.
+	 * 
+	 * @param messages Liste des messages à filtrer
+	 * @param conversationUser ConversationUser contenant les informations d'absence
+	 * @return Liste des messages filtrés
+	 */
+	private List<Message> filterMessagesByAbsencePeriods(
+			List<Message> messages, 
+			ConversationUser conversationUser
+	) {
+		if (messages == null || messages.isEmpty() || conversationUser == null) {
+			return messages != null ? messages : new ArrayList<>();
+		}
+		
+		Date userCreatedAt = conversationUser.getCreatedAt();
+		if (userCreatedAt == null) {
+			return messages;
+		}
+		
+		List<Message> filteredMessages = new ArrayList<>();
+		
+		for (Message message : messages) {
+			if (message.getCreatedAt() == null) {
+				continue;
+			}
+			
+			// Filtre 1: Messages après la création de l'utilisateur
+			if (message.getCreatedAt().before(userCreatedAt)) {
+				continue;
+			}
+			
+			// Filtre 2: Périodes d'absence
+			Date leftAt = conversationUser.getLeftAt();
+			Date recreatedAt = conversationUser.getRecreatedAt();
+			Date definitivelyLeftAt = conversationUser.getDefinitivelyLeftAt();
+			Boolean hasDefinitivelyLeft = conversationUser.getHasDefinitivelyLeft();
+			
+			boolean isVisible = true;
+			
+			if (leftAt != null) {
+				if (recreatedAt != null) {
+					// Période d'absence: leftAt -> recreatedAt
+					if (message.getCreatedAt().compareTo(leftAt) >= 0 
+							&& message.getCreatedAt().before(recreatedAt)) {
+						isVisible = false;
+					}
+				} else if (Utilities.isTrue(hasDefinitivelyLeft) && definitivelyLeftAt != null) {
+					// Utilisateur a quitté définitivement
+					if (message.getCreatedAt().compareTo(definitivelyLeftAt) >= 0) {
+						isVisible = false;
+					}
+				} else {
+					// Utilisateur a quitté mais pas définitivement (toujours absent)
+					if (message.getCreatedAt().compareTo(leftAt) >= 0) {
+						isVisible = false;
+					}
+				}
+			}
+			
+			if (isVisible) {
+				filteredMessages.add(message);
+			}
+		}
+		
+		return filteredMessages;
 	}
 
 	/**
