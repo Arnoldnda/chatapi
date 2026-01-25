@@ -8,6 +8,7 @@
 
 package ci.orange.chatapi.business;
 
+import ci.orange.chatapi.dao.entity.*;
 import lombok.extern.java.Log;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,9 +29,6 @@ import ci.orange.chatapi.utils.contract.IBasicBusiness;
 import ci.orange.chatapi.utils.contract.Request;
 import ci.orange.chatapi.utils.contract.Response;
 import ci.orange.chatapi.utils.dto.transformer.*;
-import ci.orange.chatapi.dao.entity.ConversationUser;
-import ci.orange.chatapi.dao.entity.User;
-import ci.orange.chatapi.dao.entity.Conversation;
 import ci.orange.chatapi.dao.repository.*;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -51,6 +49,10 @@ public class ConversationUserBusiness implements IBasicBusiness<Request<Conversa
 	private UserRepository userRepository;
 	@Autowired
 	private ConversationRepository conversationRepository;
+    @Autowired
+    private MessageRepository messageRepository;
+    @Autowired
+    private HistoriqueSuppressionMessageRepository historiqueSuppressionMessageRepository;
 	@Autowired
 	private FunctionalError functionalError;
 	@Autowired
@@ -657,6 +659,29 @@ public class ConversationUserBusiness implements IBasicBusiness<Request<Conversa
                         return response;
                     }
 
+                }
+
+                // Supprimer tous les messages de la conversation pour l'acteur
+                List<Message> messagesToDelete = messageRepository.findMessagesForUserComplete(
+                        existingConversation.getId(), actorId);
+                
+                if (messagesToDelete != null && !messagesToDelete.isEmpty()) {
+                    List<HistoriqueSuppressionMessage> historiqueItems = new ArrayList<>();
+                    for (Message message : messagesToDelete) {
+                        HistoriqueSuppressionMessage hsm = new HistoriqueSuppressionMessage();
+                        hsm.setUser(actor);
+                        hsm.setMessage(message);
+                        hsm.setIsHidden(true);
+                        hsm.setCreatedAt(Utilities.getCurrentDate());
+                        hsm.setCreatedBy(actorId);
+                        hsm.setIsDeleted(false);
+                        historiqueItems.add(hsm);
+                    }
+                    
+                    if (!historiqueItems.isEmpty()) {
+                        historiqueSuppressionMessageRepository.saveAll(historiqueItems);
+                        log.info("Suppression locale de " + historiqueItems.size() + " messages pour l'utilisateur " + actorId + " dans la conversation " + existingConversation.getId());
+                    }
                 }
 
                 // Marquer comme supprimé localement
